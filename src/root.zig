@@ -5,6 +5,7 @@ pub const types = @import("types.zig");
 pub const constants = @import("constants.zig");
 pub const manse = @import("manse.zig");
 pub const analyze = @import("analyze.zig");
+pub const format = @import("format.zig");
 
 // Re-export core types for convenience
 pub const Stem = types.Stem;
@@ -130,6 +131,65 @@ pub const SajuResult = struct {
     /// Convenience: day branch.
     pub fn dayBranch(self: *const SajuResult) Branch {
         return self.pillars.day.branch;
+    }
+
+    /// Writes compact text output to the given writer.
+    pub fn writeCompact(self: *const SajuResult, writer: anytype, current_year: u16) !void {
+        try format.writeCompactText(
+            writer,
+            self.input,
+            self.normalized,
+            self.pillars,
+            self.pillar_details,
+            self.gongmang,
+            self.five_elements,
+            self.twelve_stages_bong,
+            self.twelve_stages_geo,
+            self.twelve_sals,
+            self.special_sals,
+            self.stem_relations,
+            self.branch_relations,
+            self.day_strength,
+            self.geukguk,
+            self.yongsin,
+            self.advanced_sinsal,
+            self.daeun_forward,
+            self.daeun_start_age,
+            self.daeun,
+            self.seyun,
+            self.wolun,
+            current_year,
+        );
+    }
+
+    /// Writes markdown output to the given writer.
+    pub fn writeMarkdownFmt(self: *const SajuResult, writer: anytype, current_year: u16) !void {
+        try format.writeMarkdown(
+            writer,
+            self.input,
+            self.normalized,
+            self.pillars,
+            self.pillar_details,
+            self.gongmang,
+            self.five_elements,
+            self.twelve_stages_bong,
+            self.twelve_stages_geo,
+            self.twelve_sals,
+            self.special_sals,
+            self.stem_relations,
+            self.branch_relations,
+            self.day_strength,
+            self.geukguk,
+            self.yongsin,
+            self.advanced_sinsal,
+            self.daeun_forward,
+            self.daeun_start_age,
+            self.daeun,
+            self.seyun,
+            self.wolun,
+            current_year,
+            self.interpretation(),
+        );
     }
 };
 
