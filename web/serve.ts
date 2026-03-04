@@ -38,6 +38,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
 const server = Bun.serve({
   port: PORT,
+  idleTimeout: 120, // seconds — opencode run can take a while for LLM inference
 
   async fetch(req) {
     const url = new URL(req.url);
@@ -111,73 +112,57 @@ async function handleInterpret(req: Request): Promise<Response> {
     },
   );
 
-  // Stream stdout back to the client, extracting text from JSON events.
-  // opencode --format json emits one JSON object per line with { type, ... }.
-  // We look for assistant text events and forward just the text content.
+  // opencode run returns everything in a single "text" event (not streamed),
+  // so we collect the full output then extract the text.
+  // Send keepalive spaces every 5s so the browser doesn't drop the connection.
+  const keepalive = setInterval(() => {
+    // nothing — the ReadableStream below handles keepalive
+  }, 5000);
+
   const stream = new ReadableStream({
     async start(controller) {
-      const reader = proc.stdout.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+      const encoder = new TextEncoder();
+
+      // Send a keepalive space every 5 seconds to prevent browser/proxy timeout
+      const pulse = setInterval(() => {
+        controller.enqueue(encoder.encode(" "));
+      }, 5000);
 
       try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-
-          // Process complete lines
-          let newlineIdx: number;
-          while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
-            const line = buffer.slice(0, newlineIdx).trim();
-            buffer = buffer.slice(newlineIdx + 1);
-
-            if (!line) continue;
-
-            try {
-              const event = JSON.parse(line);
-              // opencode JSON format emits events with type "text" for content
-              const text = extractText(event);
-              if (text) {
-                controller.enqueue(new TextEncoder().encode(text));
-              }
-            } catch {
-              // Not valid JSON — forward raw line as fallback
-              controller.enqueue(new TextEncoder().encode(line + "\n"));
-            }
-          }
-        }
-
-        // Flush remaining buffer
-        if (buffer.trim()) {
-          try {
-            const event = JSON.parse(buffer.trim());
-            const text = extractText(event);
-            if (text) {
-              controller.enqueue(new TextEncoder().encode(text));
-            }
-          } catch {
-            controller.enqueue(new TextEncoder().encode(buffer));
-          }
-        }
-
-        // Check exit code
+        const stdout = await new Response(proc.stdout).text();
         const exitCode = await proc.exited;
-        if (exitCode !== 0) {
-          const stderrReader = proc.stderr.getReader();
-          const { value: errBytes } = await stderrReader.read();
-          const errMsg = errBytes
-            ? new TextDecoder().decode(errBytes)
-            : `opencode exited with code ${exitCode}`;
-          controller.enqueue(
-            new TextEncoder().encode(`\n\n[Error: ${errMsg.trim()}]`),
-          );
+
+        clearInterval(pulse);
+        clearInterval(keepalive);
+
+        // Extract text from NDJSON events
+        let result = "";
+        for (const line of stdout.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            const text = extractText(event);
+            if (text) result += text;
+          } catch {
+            // skip non-JSON lines
+          }
+        }
+
+        if (!result && exitCode !== 0) {
+          const stderrText = await new Response(proc.stderr).text();
+          const errMsg = stderrText.trim() || `opencode exited with code ${exitCode}`;
+          controller.enqueue(encoder.encode(`[Error: ${errMsg}]`));
+        } else if (result) {
+          controller.enqueue(encoder.encode(result));
+        } else {
+          controller.enqueue(encoder.encode("[No response from AI]"));
         }
       } catch (err) {
+        clearInterval(pulse);
+        clearInterval(keepalive);
         controller.enqueue(
           new TextEncoder().encode(
-            `\n\n[Stream error: ${err instanceof Error ? err.message : err}]`,
+            `[Error: ${err instanceof Error ? err.message : err}]`,
           ),
         );
       } finally {
@@ -189,7 +174,6 @@ async function handleInterpret(req: Request): Promise<Response> {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "Transfer-Encoding": "chunked",
       "Cache-Control": "no-cache",
     },
   });

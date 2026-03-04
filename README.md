@@ -29,6 +29,12 @@ Lunar-solar calendar conversion is provided by **[zig-klc](https://github.com/ch
 - CLI with full option support
 - Korea DST handling (1960, 1987--1988)
 - Local Mean Time (LMT) correction
+- WASM build target (wasm32-freestanding, ~74KB ReleaseSmall)
+- Browser test page with AI-powered saju interpretation (via Bun + opencode)
+
+## Web UI
+
+![zig-saju web UI](screenshots/web.png)
 
 ## Dependencies
 
@@ -104,6 +110,27 @@ result.writeCompact(writer, 2026);
 result.writeMarkdownFmt(writer, 2026);
 ```
 
+### WASM
+
+Build the WASM module (~74KB):
+
+```sh
+zig build wasm
+# or
+task wasm
+```
+
+### Web UI
+
+Start the browser test page (requires [Bun](https://bun.sh)):
+
+```sh
+task web
+# → http://localhost:3000
+```
+
+The web UI calculates saju entirely in the browser via WASM, renders pillars/summary/daeun, and offers AI interpretation powered by `opencode run`.
+
 ## Testing
 
 ```sh
@@ -132,7 +159,12 @@ zig-saju/
     constants.zig      Lookup tables, ten gods, hidden stems, solar term data
     manse.zig          Calendar engine: solar longitude, solar terms, pillars
     analyze.zig        Analysis: relations, sals, strength, geukguk, yongsin, daeun
-    format.zig         Compact text and Markdown formatters
+    format.zig         Compact text, Markdown, and JSON formatters
+    wasm.zig           WASM export layer (calculate, getResultPtr, getResultLen)
+  web/
+    index.html         Browser test page (60:30:10 warm paper theme)
+    saju.ts            TypeScript WASM wrapper, UI rendering, AI streaming
+    serve.ts           Bun HTTP server (bundles TS, serves WASM, proxies opencode)
 ```
 
 ## Differences from ssaju (TypeScript)

@@ -175,18 +175,18 @@
 
     /* Summary grid — 30% cards + 10% accent left-border */
     .summary-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      display: grid; grid-template-columns: repeat(3, 1fr);
       gap: 0.75rem; margin: 1rem 0;
     }
     .summary-card {
       background: var(--surface); padding: 1rem; border-radius: 10px;
       border: 1px solid var(--border);
       border-left: 4px solid var(--accent);
-      box-shadow: 0 1px 4px var(--shadow);
+      box-shadow: 0 2px 6px var(--shadow);
       transition: box-shadow 0.15s, transform 0.15s;
     }
     .summary-card:hover {
-      box-shadow: 0 3px 12px var(--shadow);
+      box-shadow: 0 4px 14px rgba(120, 100, 70, 0.12);
       transform: translateY(-1px);
     }
     .summary-card p { font-size: 0.95rem; color: var(--text-secondary); margin-top: 0.25rem; }
@@ -194,12 +194,14 @@
 
     /* Daeun timeline — 30% cards + 10% accent on pillar chars */
     .daeun-timeline {
-      display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.5rem 0 0.75rem;
+      display: grid; grid-template-columns: repeat(10, 1fr);
+      gap: 0.5rem; padding: 0.5rem 0 0.75rem;
     }
     .daeun-item {
-      flex: 0 0 auto; width: 82px; text-align: center;
+      text-align: center;
       background: var(--surface); border-radius: 10px; padding: 0.6rem 0.4rem;
       border: 1px solid var(--border);
+      box-shadow: 0 2px 6px var(--shadow);
       transition: box-shadow 0.15s, transform 0.15s;
     }
     .daeun-item:hover {
@@ -214,11 +216,48 @@
     /* Interpret section */
     #interpret-section { margin-top: 1.5rem; }
     #interpret-output {
-      background: var(--surface); padding: 1.25rem; border-radius: 12px;
-      white-space: pre-wrap; font-size: 1rem; line-height: 1.8;
-      max-height: 500px; overflow-y: auto; margin-top: 0.75rem;
+      background: var(--surface); padding: 1.5rem 2rem; border-radius: 12px;
+      font-size: 1rem; line-height: 1.8;
+      max-height: none; overflow-y: auto; margin-top: 0.75rem;
       border: 1px solid var(--border);
       box-shadow: 0 2px 8px var(--shadow);
+    }
+    /* Markdown prose inside interpret output */
+    #interpret-output h1 { font-size: 1.5rem; margin: 1.5rem 0 0.75rem; color: var(--heading); border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; }
+    #interpret-output h2 { font-size: 1.25rem; margin: 1.25rem 0 0.6rem; color: var(--heading); border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+    #interpret-output h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--accent); }
+    #interpret-output p { margin: 0.5rem 0; }
+    #interpret-output ul, #interpret-output ol { margin: 0.5rem 0 0.5rem 1.5rem; }
+    #interpret-output li { margin: 0.25rem 0; }
+    #interpret-output strong { color: var(--heading); }
+    #interpret-output hr { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+    #interpret-output table {
+      width: 100%; border-collapse: collapse; margin: 0.75rem 0;
+      font-size: 0.95rem;
+    }
+    #interpret-output th {
+      background: var(--card); color: var(--heading); font-weight: 600;
+      padding: 0.5rem 0.75rem; text-align: left;
+      border-bottom: 2px solid var(--border);
+    }
+    #interpret-output td {
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    #interpret-output tr:hover td { background: var(--accent-light); }
+    #interpret-output code {
+      background: var(--card); padding: 0.15rem 0.4rem; border-radius: 4px;
+      font-size: 0.9em; color: var(--accent);
+    }
+    #interpret-output pre {
+      background: var(--card); padding: 1rem; border-radius: 8px;
+      overflow-x: auto; margin: 0.75rem 0;
+    }
+    #interpret-output pre code { background: none; padding: 0; color: var(--text); }
+    #interpret-output blockquote {
+      border-left: 4px solid var(--accent); margin: 0.75rem 0;
+      padding: 0.5rem 1rem; background: var(--accent-light);
+      color: var(--text-secondary); border-radius: 0 8px 8px 0;
     }
     .spinner {
       display: inline-block; width: 16px; height: 16px;

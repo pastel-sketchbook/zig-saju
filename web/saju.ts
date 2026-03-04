@@ -3,6 +3,8 @@
 /// Loads the compiled `saju.wasm` module and exposes a typed `calculateSaju`
 /// function that returns parsed JSON.
 
+import { marked } from "marked";
+
 // -- WASM export types --
 
 interface SajuWasmExports {
@@ -348,34 +350,49 @@ async function streamInterpret(
   outputEl: HTMLElement,
   onDone: () => void,
 ): Promise<void> {
-  outputEl.textContent = "";
+  try {
+    const resp = await fetch("/api/interpret", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(result),
+    });
 
-  const resp = await fetch("/api/interpret", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(result),
-  });
+    if (!resp.ok) {
+      outputEl.textContent = `Server error: ${resp.status} ${await resp.text()}`;
+      onDone();
+      return;
+    }
 
-  if (!resp.ok) {
-    outputEl.textContent = `Server error: ${resp.status} ${await resp.text()}`;
-    onDone();
-    return;
-  }
+    const reader = resp.body?.getReader();
+    if (!reader) {
+      outputEl.textContent = "Streaming not supported.";
+      onDone();
+      return;
+    }
 
-  const reader = resp.body?.getReader();
-  if (!reader) {
-    outputEl.textContent = "Streaming not supported.";
-    onDone();
-    return;
-  }
+    const decoder = new TextDecoder();
+    let first = true;
+    let content = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      // Server sends keepalive spaces while waiting for AI; skip whitespace-only chunks
+      if (!chunk.trim()) continue;
+      if (first) {
+        outputEl.innerHTML = "";
+        first = false;
+      }
+      content += chunk;
+      outputEl.innerHTML = marked.parse(content.trimStart()) as string;
+      outputEl.scrollTop = outputEl.scrollHeight;
+    }
 
-  const decoder = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    outputEl.textContent += decoder.decode(value, { stream: true });
-    // Auto-scroll to bottom
-    outputEl.scrollTop = outputEl.scrollHeight;
+    if (first) {
+      outputEl.textContent = "No response received from AI.";
+    }
+  } catch (err) {
+    outputEl.textContent = `Error: ${err instanceof Error ? err.message : err}`;
   }
   onDone();
 }
