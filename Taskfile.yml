@@ -67,6 +67,16 @@ tasks:
     cmds:
       - zig build run -- --year 1992 --month 10 --day 24 --hour 5 --minute 30 --longitude 126.9784 --lmt
 
+  wasm:
+    desc: Build WASM module (ReleaseSmall)
+    cmds:
+      - zig build wasm
+
+  wasm-release:
+    desc: Build WASM module with ReleaseSafe optimisation
+    cmds:
+      - zig build wasm -Dwasm-optimize=ReleaseSafe
+
   loc:
     desc: Count lines of code with tokei
     cmds:

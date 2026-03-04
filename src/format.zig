@@ -939,3 +939,673 @@ test "writeMarkdown: produces output for golden case" {
     try testing.expect(std.mem.indexOf(u8, output, "## 해석 시 주의 포인트") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 만세력") != null);
 }
+
+// =============================
+// JSON Output
+// =============================
+
+// -- JSON helpers (private) --
+
+fn jsonStr(w: anytype, s: []const u8) !void {
+    try w.writeByte('"');
+    for (s) |c| {
+        switch (c) {
+            '"' => try w.writeAll("\\\""),
+            '\\' => try w.writeAll("\\\\"),
+            '\n' => try w.writeAll("\\n"),
+            '\r' => try w.writeAll("\\r"),
+            '\t' => try w.writeAll("\\t"),
+            else => try w.writeByte(c),
+        }
+    }
+    try w.writeByte('"');
+}
+
+fn jsonKey(w: anytype, key: []const u8) !void {
+    try jsonStr(w, key);
+    try w.writeByte(':');
+}
+
+fn jsonOptStem(w: anytype, stem: ?Stem) !void {
+    if (stem) |s| {
+        try jsonStr(w, s.hanja());
+    } else {
+        try w.writeAll("null");
+    }
+}
+
+fn jsonPillar(w: anytype, pillar: Pillar) !void {
+    try w.writeByte('{');
+    try jsonKey(w, "stem");
+    try jsonStr(w, pillar.stem.hanja());
+    try w.writeByte(',');
+    try jsonKey(w, "stemKo");
+    try jsonStr(w, pillar.stem.korean());
+    try w.writeByte(',');
+    try jsonKey(w, "branch");
+    try jsonStr(w, pillar.branch.hanja());
+    try w.writeByte(',');
+    try jsonKey(w, "branchKo");
+    try jsonStr(w, pillar.branch.korean());
+    try w.writeByte('}');
+}
+
+fn jsonSpecialSals(w: anytype, sals: analyze.SpecialSals) !void {
+    try w.writeByte('{');
+    try jsonKey(w, "cheonEulGwiin");
+    try w.writeAll(if (sals.cheonEulGwiin) "true" else "false");
+    try w.writeByte(',');
+    try jsonKey(w, "yeokma");
+    try w.writeAll(if (sals.yeokma) "true" else "false");
+    try w.writeByte(',');
+    try jsonKey(w, "dohwa");
+    try w.writeAll(if (sals.dohwa) "true" else "false");
+    try w.writeByte(',');
+    try jsonKey(w, "hwagae");
+    try w.writeAll(if (sals.hwagae) "true" else "false");
+    try w.writeByte('}');
+}
+
+/// Writes the complete saju analysis result as compact JSON.
+pub fn writeJson(
+    writer: anytype,
+    input: SajuInput,
+    normalized: NormalizedBirth,
+    pillars: FourPillars,
+    pillar_details: [4]PillarDetail,
+    gongmang: [2]Branch,
+    five_elements: [5]u8,
+    twelve_stages_bong: [4]constants.TwelveStage,
+    twelve_stages_geo: [4]constants.TwelveStage,
+    twelve_sals: [4][]const u8,
+    special_sals: [4]analyze.SpecialSals,
+    stem_relations: analyze.StemRelationsResult,
+    branch_relations: analyze.BranchRelations,
+    day_strength: analyze.DayStrengthResult,
+    geukguk: analyze.Geukguk,
+    yongsin: [3]Stem,
+    advanced_sinsal: analyze.AdvancedSinsal,
+    daeun_forward: bool,
+    daeun_start_age: u8,
+    daeun_precise_age: f64,
+    daeun_diff_days: f64,
+    daeun: [10]analyze.DaeunItem,
+    seyun: [10]analyze.SeyunItem,
+    wolun: [12]analyze.WolunItem,
+    relation_priorities: analyze.RelationPriorities,
+    caution_points: analyze.CautionPoints,
+    reference_codes: manse.ReferenceCodes,
+    current_year: u16,
+    interpretation: []const u8,
+) !void {
+    const day_stem = pillars.day.stem;
+    const solar = normalized.solar;
+
+    try writer.writeByte('{');
+
+    // -- input --
+    try jsonKey(writer, "input");
+    try writer.writeByte('{');
+    try jsonKey(writer, "year");
+    try writer.print("{d}", .{input.year});
+    try writer.writeByte(',');
+    try jsonKey(writer, "month");
+    try writer.print("{d}", .{input.month});
+    try writer.writeByte(',');
+    try jsonKey(writer, "day");
+    try writer.print("{d}", .{input.day});
+    try writer.writeByte(',');
+    try jsonKey(writer, "hour");
+    try writer.print("{d}", .{input.hour});
+    try writer.writeByte(',');
+    try jsonKey(writer, "minute");
+    try writer.print("{d}", .{input.minute});
+    try writer.writeByte(',');
+    try jsonKey(writer, "gender");
+    try jsonStr(writer, input.gender.korean());
+    try writer.writeByte(',');
+    try jsonKey(writer, "calendar");
+    try jsonStr(writer, if (input.calendar == .solar) "양력" else "음력");
+    try writer.writeByte(',');
+    try jsonKey(writer, "leap");
+    try writer.writeAll(if (input.leap) "true" else "false");
+    try writer.writeByte('}');
+
+    // -- normalized --
+    try writer.writeByte(',');
+    try jsonKey(writer, "normalized");
+    try writer.writeByte('{');
+    try jsonKey(writer, "solar");
+    try writer.print("{{\"year\":{d},\"month\":{d},\"day\":{d}}}", .{ solar.year, solar.month, solar.day });
+    try writer.writeByte(',');
+    try jsonKey(writer, "kst");
+    try writer.print("{{\"year\":{d},\"month\":{d},\"day\":{d},\"hour\":{d},\"minute\":{d}}}", .{
+        normalized.kst.year, normalized.kst.month,  normalized.kst.day,
+        normalized.kst.hour, normalized.kst.minute,
+    });
+    try writer.writeByte(',');
+    try jsonKey(writer, "calculation");
+    try writer.print("{{\"year\":{d},\"month\":{d},\"day\":{d},\"hour\":{d},\"minute\":{d}}}", .{
+        normalized.calculation.year, normalized.calculation.month,  normalized.calculation.day,
+        normalized.calculation.hour, normalized.calculation.minute,
+    });
+    try writer.writeByte(',');
+    try jsonKey(writer, "lmt");
+    if (normalized.local_mean_time) |lmt| {
+        try writer.print("{{\"year\":{d},\"month\":{d},\"day\":{d},\"hour\":{d},\"minute\":{d},\"longitude\":{d:.4},\"offsetMinutes\":{d:.1},\"standardLongitude\":{d:.1}}}", .{
+            lmt.year,      lmt.month,          lmt.day,                lmt.hour, lmt.minute,
+            lmt.longitude, lmt.offset_minutes, lmt.standard_longitude,
+        });
+    } else {
+        try writer.writeAll("null");
+    }
+    try writer.writeByte('}');
+
+    // -- dayMaster --
+    try writer.writeByte(',');
+    try jsonKey(writer, "dayMaster");
+    try writer.writeByte('{');
+    try jsonKey(writer, "hanja");
+    try jsonStr(writer, day_stem.hanja());
+    try writer.writeByte(',');
+    try jsonKey(writer, "korean");
+    try jsonStr(writer, day_stem.korean());
+    try writer.writeByte(',');
+    try jsonKey(writer, "element");
+    try jsonStr(writer, day_stem.element().korean());
+    try writer.writeByte(',');
+    try jsonKey(writer, "yinYang");
+    try jsonStr(writer, day_stem.yinYang().korean());
+    try writer.writeByte('}');
+
+    // -- pillars --
+    try writer.writeByte(',');
+    try jsonKey(writer, "pillars");
+    try writer.writeByte('{');
+    const pillar_keys = [_][]const u8{ "year", "month", "day", "hour" };
+    const pillar_arr = [_]Pillar{ pillars.year, pillars.month, pillars.day, pillars.hour };
+    for (pillar_keys, pillar_arr, 0..) |key, p, i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonKey(writer, key);
+        try jsonPillar(writer, p);
+    }
+    try writer.writeByte('}');
+
+    // -- pillarDetails --
+    try writer.writeByte(',');
+    try jsonKey(writer, "pillarDetails");
+    try writer.writeByte('[');
+    const positions = [_][]const u8{ "년", "월", "일", "시" };
+    for (pillar_details, positions, 0..) |pd, pos, i| {
+        if (i > 0) try writer.writeByte(',');
+        try writer.writeByte('{');
+        try jsonKey(writer, "position");
+        try jsonStr(writer, pos);
+        try writer.writeByte(',');
+        try jsonKey(writer, "stem");
+        try jsonStr(writer, pd.stem.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branch");
+        try jsonStr(writer, pd.branch.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "hiddenStems");
+        try writer.writeByte('{');
+        try jsonKey(writer, "yeogi");
+        try jsonOptStem(writer, pd.hidden_stems.yeogi);
+        try writer.writeByte(',');
+        try jsonKey(writer, "junggi");
+        try jsonOptStem(writer, pd.hidden_stems.junggi);
+        try writer.writeByte(',');
+        try jsonKey(writer, "jeonggi");
+        try jsonStr(writer, pd.hidden_stems.jeonggi.hanja());
+        try writer.writeByte('}');
+        try writer.writeByte(',');
+        try jsonKey(writer, "stemTenGod");
+        try jsonStr(writer, pd.stem_ten_god.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branchTenGod");
+        try jsonStr(writer, pd.branch_ten_god.korean());
+        try writer.writeByte('}');
+    }
+    try writer.writeByte(']');
+
+    // -- gongmang --
+    try writer.writeByte(',');
+    try jsonKey(writer, "gongmang");
+    try writer.writeByte('[');
+    try jsonStr(writer, gongmang[0].hanja());
+    try writer.writeByte(',');
+    try jsonStr(writer, gongmang[1].hanja());
+    try writer.writeByte(']');
+
+    // -- fiveElements --
+    try writer.writeByte(',');
+    try jsonKey(writer, "fiveElements");
+    try writer.print("{{\"wood\":{d},\"fire\":{d},\"earth\":{d},\"metal\":{d},\"water\":{d}}}", .{
+        five_elements[0], five_elements[1], five_elements[2],
+        five_elements[3], five_elements[4],
+    });
+
+    // -- twelveStages --
+    try writer.writeByte(',');
+    try jsonKey(writer, "twelveStages");
+    try writer.writeByte('{');
+    try jsonKey(writer, "bong");
+    try writer.writeByte('[');
+    for (twelve_stages_bong, 0..) |stage, i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonStr(writer, stage.korean());
+    }
+    try writer.writeByte(']');
+    try writer.writeByte(',');
+    try jsonKey(writer, "geo");
+    try writer.writeByte('[');
+    for (twelve_stages_geo, 0..) |stage, i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonStr(writer, stage.korean());
+    }
+    try writer.writeByte(']');
+    try writer.writeByte('}');
+
+    // -- twelveSals --
+    try writer.writeByte(',');
+    try jsonKey(writer, "twelveSals");
+    try writer.writeByte('[');
+    for (twelve_sals, 0..) |sal, i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonStr(writer, sal);
+    }
+    try writer.writeByte(']');
+
+    // -- specialSals --
+    try writer.writeByte(',');
+    try jsonKey(writer, "specialSals");
+    try writer.writeByte('[');
+    for (special_sals, 0..) |sals, i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonSpecialSals(writer, sals);
+    }
+    try writer.writeByte(']');
+
+    // -- stemRelations --
+    try writer.writeByte(',');
+    try jsonKey(writer, "stemRelations");
+    try writer.writeByte('[');
+    for (0..stem_relations.count) |i| {
+        if (i > 0) try writer.writeByte(',');
+        const rel = stem_relations.items[i];
+        try writer.writeByte('{');
+        try jsonKey(writer, "type");
+        try jsonStr(writer, rel.rel_type.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "pillarA");
+        try jsonStr(writer, rel.pillar_a.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "pillarB");
+        try jsonStr(writer, rel.pillar_b.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "stemA");
+        try jsonStr(writer, rel.stem_a.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "stemB");
+        try jsonStr(writer, rel.stem_b.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "hapElement");
+        if (rel.hap_element) |elem| {
+            try jsonStr(writer, elem.korean());
+        } else {
+            try writer.writeAll("null");
+        }
+        try writer.writeByte('}');
+    }
+    try writer.writeByte(']');
+
+    // -- branchRelations --
+    try writer.writeByte(',');
+    try jsonKey(writer, "branchRelations");
+    try writer.writeByte('{');
+    try jsonKey(writer, "pairs");
+    try writer.writeByte('[');
+    for (0..branch_relations.pair_count) |i| {
+        if (i > 0) try writer.writeByte(',');
+        const rel = branch_relations.pairs[i];
+        try writer.writeByte('{');
+        try jsonKey(writer, "type");
+        try jsonStr(writer, rel.rel_type.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "pillarA");
+        try jsonStr(writer, rel.pillar_a.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "pillarB");
+        try jsonStr(writer, rel.pillar_b.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branchA");
+        try jsonStr(writer, rel.branch_a.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branchB");
+        try jsonStr(writer, rel.branch_b.hanja());
+        try writer.writeByte('}');
+    }
+    try writer.writeByte(']');
+    try writer.writeByte(',');
+    try jsonKey(writer, "triples");
+    try writer.writeByte('[');
+    for (0..branch_relations.triple_count) |i| {
+        if (i > 0) try writer.writeByte(',');
+        const rel = branch_relations.triples[i];
+        try writer.writeByte('{');
+        try jsonKey(writer, "type");
+        try jsonStr(writer, rel.rel_type.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "pillars");
+        try writer.writeByte('[');
+        for (0..rel.pillar_count) |j| {
+            if (j > 0) try writer.writeByte(',');
+            try jsonStr(writer, rel.pillar_keys[j].korean());
+        }
+        try writer.writeByte(']');
+        try writer.writeByte(',');
+        try jsonKey(writer, "branches");
+        try writer.writeByte('[');
+        for (0..rel.pillar_count) |j| {
+            if (j > 0) try writer.writeByte(',');
+            try jsonStr(writer, rel.branches[j].hanja());
+        }
+        try writer.writeByte(']');
+        try writer.writeByte(',');
+        try jsonKey(writer, "name");
+        try jsonStr(writer, rel.name);
+        try writer.writeByte('}');
+    }
+    try writer.writeByte(']');
+    try writer.writeByte('}');
+
+    // -- dayStrength --
+    try writer.writeByte(',');
+    try jsonKey(writer, "dayStrength");
+    try writer.writeByte('{');
+    try jsonKey(writer, "strength");
+    try jsonStr(writer, day_strength.strength.korean());
+    try writer.writeByte(',');
+    try jsonKey(writer, "score");
+    try writer.print("{d}", .{day_strength.score});
+    try writer.writeByte('}');
+
+    // -- geukguk --
+    try writer.writeByte(',');
+    try jsonKey(writer, "geukguk");
+    try jsonStr(writer, geukguk.korean());
+
+    // -- yongsin --
+    try writer.writeByte(',');
+    try jsonKey(writer, "yongsin");
+    try writer.writeByte('[');
+    for (yongsin, 0..) |stem, i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonStr(writer, stem.hanja());
+    }
+    try writer.writeByte(']');
+
+    // -- advancedSinsal --
+    try writer.writeByte(',');
+    try jsonKey(writer, "advancedSinsal");
+    try writer.writeByte('{');
+    try jsonKey(writer, "gilsin");
+    try writer.writeByte('[');
+    for (0..advanced_sinsal.gilsin_count) |i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonStr(writer, advanced_sinsal.gilsin[i]);
+    }
+    try writer.writeByte(']');
+    try writer.writeByte(',');
+    try jsonKey(writer, "hyungsin");
+    try writer.writeByte('[');
+    for (0..advanced_sinsal.hyungsin_count) |i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonStr(writer, advanced_sinsal.hyungsin[i]);
+    }
+    try writer.writeByte(']');
+    try writer.writeByte('}');
+
+    // -- relationPriorities --
+    try writer.writeByte(',');
+    try jsonKey(writer, "relationPriorities");
+    try writer.writeByte('[');
+    for (0..relation_priorities.count) |i| {
+        if (i > 0) try writer.writeByte(',');
+        const item = relation_priorities.items[i];
+        try writer.writeByte('{');
+        try jsonKey(writer, "label");
+        try jsonStr(writer, item.label);
+        try writer.writeByte(',');
+        try jsonKey(writer, "score");
+        try writer.print("{d}.{d}", .{ item.score_x10 / 10, item.score_x10 % 10 });
+        try writer.writeByte(',');
+        try jsonKey(writer, "note");
+        try jsonStr(writer, item.note);
+        try writer.writeByte('}');
+    }
+    try writer.writeByte(']');
+
+    // -- cautionPoints --
+    try writer.writeByte(',');
+    try jsonKey(writer, "cautionPoints");
+    try writer.writeByte('[');
+    for (0..caution_points.count) |i| {
+        if (i > 0) try writer.writeByte(',');
+        try jsonStr(writer, caution_points.items[i]);
+    }
+    try writer.writeByte(']');
+
+    // -- referenceCodes --
+    try writer.writeByte(',');
+    try jsonKey(writer, "referenceCodes");
+    try writer.writeByte('{');
+    try jsonKey(writer, "thisYear");
+    try jsonStr(writer, &reference_codes.this_year);
+    try writer.writeByte(',');
+    try jsonKey(writer, "nextYear");
+    try jsonStr(writer, &reference_codes.next_year);
+    try writer.writeByte(',');
+    try jsonKey(writer, "thisMonth");
+    try jsonStr(writer, &reference_codes.this_month);
+    try writer.writeByte(',');
+    try jsonKey(writer, "nextMonth");
+    try jsonStr(writer, &reference_codes.next_month);
+    try writer.writeByte(',');
+    try jsonKey(writer, "today");
+    try jsonStr(writer, &reference_codes.today);
+    try writer.writeByte(',');
+    try jsonKey(writer, "tomorrow");
+    try jsonStr(writer, &reference_codes.tomorrow);
+    try writer.writeByte(',');
+    try jsonKey(writer, "now");
+    try jsonStr(writer, reference_codes.now_label[0..reference_codes.now_label_len]);
+    try writer.writeByte('}');
+
+    // -- daeun --
+    try writer.writeByte(',');
+    try jsonKey(writer, "daeun");
+    try writer.writeByte('{');
+    try jsonKey(writer, "forward");
+    try writer.writeAll(if (daeun_forward) "true" else "false");
+    try writer.writeByte(',');
+    try jsonKey(writer, "startAge");
+    try writer.print("{d}", .{daeun_start_age});
+    try writer.writeByte(',');
+    try jsonKey(writer, "preciseAge");
+    try writer.print("{d:.2}", .{daeun_precise_age});
+    try writer.writeByte(',');
+    try jsonKey(writer, "diffDays");
+    try writer.print("{d:.1}", .{daeun_diff_days});
+    try writer.writeByte(',');
+    try jsonKey(writer, "items");
+    try writer.writeByte('[');
+    for (daeun, 0..) |d, i| {
+        if (i > 0) try writer.writeByte(',');
+        try writer.writeByte('{');
+        try jsonKey(writer, "startAge");
+        try writer.print("{d}", .{d.start_age});
+        try writer.writeByte(',');
+        try jsonKey(writer, "endAge");
+        try writer.print("{d}", .{d.end_age});
+        try writer.writeByte(',');
+        try jsonKey(writer, "stem");
+        try jsonStr(writer, d.pillar.stem.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branch");
+        try jsonStr(writer, d.pillar.branch.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "startYear");
+        try writer.print("{d}", .{d.start_year});
+        try writer.writeByte(',');
+        try jsonKey(writer, "stemTenGod");
+        try jsonStr(writer, d.stem_ten_god.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branchTenGod");
+        try jsonStr(writer, d.branch_ten_god.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "twelveStage");
+        try jsonStr(writer, d.twelve_stage.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "sals");
+        try jsonSpecialSals(writer, d.sals);
+        try writer.writeByte('}');
+    }
+    try writer.writeByte(']');
+    try writer.writeByte('}');
+
+    // -- seyun --
+    try writer.writeByte(',');
+    try jsonKey(writer, "seyun");
+    try writer.writeByte('[');
+    for (seyun, 0..) |s, i| {
+        if (i > 0) try writer.writeByte(',');
+        try writer.writeByte('{');
+        try jsonKey(writer, "year");
+        try writer.print("{d}", .{s.year});
+        try writer.writeByte(',');
+        try jsonKey(writer, "stem");
+        try jsonStr(writer, s.pillar.stem.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branch");
+        try jsonStr(writer, s.pillar.branch.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "stemTenGod");
+        try jsonStr(writer, s.ten_god_stem.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branchTenGod");
+        try jsonStr(writer, s.ten_god_branch.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "twelveStage");
+        try jsonStr(writer, s.twelve_stage.korean());
+        try writer.writeByte('}');
+    }
+    try writer.writeByte(']');
+
+    // -- wolun --
+    try writer.writeByte(',');
+    try jsonKey(writer, "wolun");
+    try writer.writeByte('[');
+    for (wolun, 0..) |m, i| {
+        if (i > 0) try writer.writeByte(',');
+        try writer.writeByte('{');
+        try jsonKey(writer, "month");
+        try writer.print("{d}", .{m.month});
+        try writer.writeByte(',');
+        try jsonKey(writer, "stem");
+        try jsonStr(writer, m.pillar.stem.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branch");
+        try jsonStr(writer, m.pillar.branch.hanja());
+        try writer.writeByte(',');
+        try jsonKey(writer, "stemTenGod");
+        try jsonStr(writer, m.stem_ten_god.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "branchTenGod");
+        try jsonStr(writer, m.branch_ten_god.korean());
+        try writer.writeByte(',');
+        try jsonKey(writer, "twelveStage");
+        try jsonStr(writer, m.twelve_stage.korean());
+        try writer.writeByte('}');
+    }
+    try writer.writeByte(']');
+
+    // -- currentYear --
+    try writer.writeByte(',');
+    try jsonKey(writer, "currentYear");
+    try writer.print("{d}", .{current_year});
+
+    // -- interpretation --
+    try writer.writeByte(',');
+    try jsonKey(writer, "interpretation");
+    try jsonStr(writer, interpretation);
+
+    try writer.writeByte('}');
+}
+
+test "writeJson: produces valid JSON structure for golden case" {
+    const root = @import("root.zig");
+    const result = try root.calculateSaju(.{
+        .year = 1992,
+        .month = 10,
+        .day = 24,
+        .hour = 5,
+        .minute = 30,
+        .gender = .male,
+        .calendar = .solar,
+    }, 2026, test_ref_time);
+
+    var buf: [32768]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    try writeJson(
+        fbs.writer(),
+        result.input,
+        result.normalized,
+        result.pillars,
+        result.pillar_details,
+        result.gongmang,
+        result.five_elements,
+        result.twelve_stages_bong,
+        result.twelve_stages_geo,
+        result.twelve_sals,
+        result.special_sals,
+        result.stem_relations,
+        result.branch_relations,
+        result.day_strength,
+        result.geukguk,
+        result.yongsin,
+        result.advanced_sinsal,
+        result.daeun_forward,
+        result.daeun_start_age,
+        result.daeun_precise_age,
+        result.daeun_diff_days,
+        result.daeun,
+        result.seyun,
+        result.wolun,
+        result.relation_priorities,
+        result.caution_points,
+        result.reference_codes,
+        2026,
+        result.interpretation(),
+    );
+
+    const output = fbs.getWritten();
+    // Starts with { and ends with }
+    try testing.expect(output.len > 100);
+    try testing.expect(output[0] == '{');
+    try testing.expect(output[output.len - 1] == '}');
+    // Contains key JSON fields
+    try testing.expect(std.mem.indexOf(u8, output, "\"input\"") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "\"pillars\"") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "\"dayMaster\"") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "\"dayStrength\"") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "\"geukguk\"") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "\"daeun\"") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "\"seyun\"") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "\"wolun\"") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "\"interpretation\"") != null);
+    // Contains expected values
+    try testing.expect(std.mem.indexOf(u8, output, "\"癸\"") != null); // day stem
+    try testing.expect(std.mem.indexOf(u8, output, "\"종왕격\"") != null); // geukguk
+}

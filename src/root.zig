@@ -256,6 +256,41 @@ pub const SajuResult = struct {
             self.interpretation(),
         );
     }
+
+    /// Writes JSON output to the given writer.
+    pub fn writeJson(self: *const SajuResult, writer: anytype, current_year: u16) !void {
+        try format.writeJson(
+            writer,
+            self.input,
+            self.normalized,
+            self.pillars,
+            self.pillar_details,
+            self.gongmang,
+            self.five_elements,
+            self.twelve_stages_bong,
+            self.twelve_stages_geo,
+            self.twelve_sals,
+            self.special_sals,
+            self.stem_relations,
+            self.branch_relations,
+            self.day_strength,
+            self.geukguk,
+            self.yongsin,
+            self.advanced_sinsal,
+            self.daeun_forward,
+            self.daeun_start_age,
+            self.daeun_precise_age,
+            self.daeun_diff_days,
+            self.daeun,
+            self.seyun,
+            self.wolun,
+            self.relation_priorities,
+            self.caution_points,
+            self.reference_codes,
+            current_year,
+            self.interpretation(),
+        );
+    }
 };
 
 // =============================
@@ -684,6 +719,41 @@ test "calculateSaju: daeun start age is valid" {
 
     try testing.expect(result.daeun_start_age >= 1);
     try testing.expect(result.daeun_precise_age > 0);
+}
+
+test "calculateSaju: JSON output contains key fields" {
+    const result = try calculateSaju(.{
+        .year = 1992,
+        .month = 10,
+        .day = 24,
+        .hour = 5,
+        .minute = 30,
+        .gender = .male,
+        .calendar = .solar,
+    }, 2026, test_ref_time);
+
+    var buf: [32768]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    try result.writeJson(fbs.writer(), 2026);
+    const json = fbs.getWritten();
+
+    // Valid JSON envelope
+    try testing.expect(json[0] == '{');
+    try testing.expect(json[json.len - 1] == '}');
+
+    // Key sections present
+    try testing.expect(std.mem.indexOf(u8, json, "\"pillars\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"dayMaster\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"dayStrength\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"geukguk\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"daeun\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"seyun\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"wolun\"") != null);
+
+    // Expected values for golden case
+    try testing.expect(std.mem.indexOf(u8, json, "\"癸\"") != null); // day stem
+    try testing.expect(std.mem.indexOf(u8, json, "\"종왕격\"") != null); // geukguk
+    try testing.expect(std.mem.indexOf(u8, json, "\"currentYear\":2026") != null);
 }
 
 test {

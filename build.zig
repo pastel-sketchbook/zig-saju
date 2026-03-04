@@ -63,4 +63,50 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+
+    // ── WASM build step (lazy — only built when `zig build wasm` is invoked) ──
+
+    const wasm_step = b.step("wasm", "Build WASM module (wasm32-freestanding)");
+
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
+    const wasm_optimize = b.option(
+        std.builtin.OptimizeMode,
+        "wasm-optimize",
+        "Optimization level for WASM build (default: ReleaseSmall)",
+    ) orelse .ReleaseSmall;
+
+    const wasm_klc_dep = b.dependency("klc", .{
+        .target = wasm_target,
+        .optimize = wasm_optimize,
+    });
+    const wasm_klc_mod = wasm_klc_dep.module("klc");
+
+    const wasm_saju_mod = b.addModule("saju-wasm", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = wasm_target,
+        .optimize = wasm_optimize,
+        .imports = &.{
+            .{ .name = "klc", .module = wasm_klc_mod },
+        },
+    });
+
+    const wasm_lib = b.addExecutable(.{
+        .name = "saju",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/wasm.zig"),
+            .target = wasm_target,
+            .optimize = wasm_optimize,
+            .imports = &.{
+                .{ .name = "saju", .module = wasm_saju_mod },
+            },
+        }),
+    });
+    wasm_lib.entry = .disabled;
+    wasm_lib.rdynamic = true;
+
+    const wasm_install = b.addInstallArtifact(wasm_lib, .{});
+    wasm_step.dependOn(&wasm_install.step);
 }
