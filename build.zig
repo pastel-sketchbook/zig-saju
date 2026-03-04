@@ -18,6 +18,13 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    // Read version from VERSION file (single source of truth)
+    const version = @embedFile("VERSION");
+    const version_trimmed = std.mem.trimRight(u8, version, &.{ '\n', '\r', ' ' });
+
+    const build_options = b.addOptions();
+    build_options.addOption([]const u8, "version", version_trimmed);
+
     const exe = b.addExecutable(.{
         .name = "saju",
         .root_module = b.createModule(.{
@@ -27,6 +34,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "saju", .module = mod },
                 .{ .name = "klc", .module = klc_mod },
+                .{ .name = "build_options", .module = build_options.createModule() },
             },
         }),
     });

@@ -77,3 +77,49 @@ tasks:
     deps: [build]
     cmds:
       - zig build run -- --year {{now | date "2006"}} --month {{now | date "1"}} --day {{now | date "2"}} --hour 11 --minute 0
+
+  version:patch:
+    desc: Bump patch version (0.0.x)
+    cmds:
+      - |
+        CUR=$(cat VERSION | tr -d '[:space:]')
+        MAJOR=$(echo $CUR | cut -d. -f1)
+        MINOR=$(echo $CUR | cut -d. -f2)
+        PATCH=$(echo $CUR | cut -d. -f3)
+        NEW="$MAJOR.$MINOR.$((PATCH + 1))"
+        echo "$NEW" > VERSION
+        sed -i "s/.version = \"$CUR\"/.version = \"$NEW\"/" build.zig.zon
+        echo "$CUR -> $NEW"
+
+  version:minor:
+    desc: Bump minor version (0.x.0)
+    cmds:
+      - |
+        CUR=$(cat VERSION | tr -d '[:space:]')
+        MAJOR=$(echo $CUR | cut -d. -f1)
+        MINOR=$(echo $CUR | cut -d. -f2)
+        NEW="$MAJOR.$((MINOR + 1)).0"
+        echo "$NEW" > VERSION
+        sed -i "s/.version = \"$CUR\"/.version = \"$NEW\"/" build.zig.zon
+        echo "$CUR -> $NEW"
+
+  version:major:
+    desc: Bump major version (x.0.0)
+    cmds:
+      - |
+        CUR=$(cat VERSION | tr -d '[:space:]')
+        MAJOR=$(echo $CUR | cut -d. -f1)
+        NEW="$((MAJOR + 1)).0.0"
+        echo "$NEW" > VERSION
+        sed -i "s/.version = \"$CUR\"/.version = \"$NEW\"/" build.zig.zon
+        echo "$CUR -> $NEW"
+
+  version:tag:
+    desc: Commit version bump and create git tag
+    cmds:
+      - |
+        VER=$(cat VERSION | tr -d '[:space:]')
+        git add VERSION build.zig.zon
+        git commit -m "chore: bump version to v$VER"
+        git tag -a "v$VER" -m "v$VER"
+        echo "tagged v$VER"
