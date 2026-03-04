@@ -8,6 +8,8 @@ Given a birth date and time, computes the Four Pillars (year, month, day, hour) 
 
 This project is a Zig port of **[ssaju](https://github.com/golbin/ssaju)** by [golbin (Jin)](https://github.com/golbin), originally written in TypeScript. All core algorithms -- solar longitude calculation (simplified VSOP87), solar term finding (Newton-Raphson), four pillars derivation, ten gods, twelve stages, stem/branch relations, geukguk/yongsin determination, and daeun/seyun/wolun generation -- are faithfully ported from the original.
 
+Lunar-solar calendar conversion is provided by **[zig-klc](https://github.com/chunghha/zig-klc)** by [chunghha](https://github.com/chunghha), a Zig port of the [rs-klc](https://crates.io/crates/rs-klc) Rust crate. zig-klc provides KASI-verified Korean lunisolar date conversion, Julian Day Number calculation, and leap year detection.
+
 ## Features
 
 - Four Pillars calculation from solar or lunar dates (1900--2050)
@@ -28,7 +30,7 @@ This project is a Zig port of **[ssaju](https://github.com/golbin/ssaju)** by [g
 
 ## Dependencies
 
-- [zig-klc](https://github.com/psk-kr/zig-klc) -- Korean Lunisolar Calendar library for Zig (lunar-solar conversion, Julian Day Number, leap year detection)
+- [zig-klc](https://github.com/chunghha/zig-klc) -- Korean Lunisolar Calendar library for Zig (lunar-solar conversion, Julian Day Number, leap year detection), a Zig port of [rs-klc](https://crates.io/crates/rs-klc)
 
 ## Build
 
@@ -148,4 +150,4 @@ zig-saju/
 
 MIT License. See [LICENSE](LICENSE).
 
-This project is a port of [ssaju](https://github.com/golbin/ssaju) by Jin, also MIT licensed.
+This project is a port of [ssaju](https://github.com/golbin/ssaju) by Jin, also MIT licensed. It depends on [zig-klc](https://github.com/chunghha/zig-klc) by chunghha.

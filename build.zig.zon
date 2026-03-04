@@ -5,7 +5,8 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .klc = .{
-            .path = "../zig-klc",
+            .url = "git+https://github.com/chunghha/zig-klc#v0.1.5",
+            .hash = "klc-0.1.5-Dcf72-cVAQB4QMB1eFb_trv_82DABs96qjeXbSIO8CCM",
         },
     },
     .paths = .{
