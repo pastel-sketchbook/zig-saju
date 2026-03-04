@@ -386,22 +386,50 @@ test "calculateSaju: lunar input matches solar" {
     try testing.expectEqual(solar_result.pillars.hour.stem, lunar_result.pillars.hour.stem);
 }
 
-test "calculateSaju: hour boundary 23:30 is 자시" {
-    const result = try calculateSaju(.{
-        .year = 1992,
-        .month = 10,
-        .day = 24,
+test "calculateSaju: hour boundary 23:30 and 00:00 are 자시, 01:00 is 축시" {
+    // TS test: 2024-01-01, female
+    const at2330 = try calculateSaju(.{
+        .year = 2024,
+        .month = 1,
+        .day = 1,
         .hour = 23,
         .minute = 30,
-        .gender = .male,
+        .gender = .female,
+        .calendar = .solar,
+    }, 2026);
+    const at0000 = try calculateSaju(.{
+        .year = 2024,
+        .month = 1,
+        .day = 1,
+        .hour = 0,
+        .minute = 0,
+        .gender = .female,
+        .calendar = .solar,
+    }, 2026);
+    const at0100 = try calculateSaju(.{
+        .year = 2024,
+        .month = 1,
+        .day = 1,
+        .hour = 1,
+        .minute = 0,
+        .gender = .female,
         .calendar = .solar,
     }, 2026);
 
-    // 23:30 should be 자시 (子)
-    try testing.expectEqual(Branch.ja, result.pillars.hour.branch);
+    // 23:30 → 甲子 (gap/ja)
+    try testing.expectEqual(Stem.gap, at2330.pillars.hour.stem);
+    try testing.expectEqual(Branch.ja, at2330.pillars.hour.branch);
+
+    // 00:00 → 甲子 (gap/ja)
+    try testing.expectEqual(Stem.gap, at0000.pillars.hour.stem);
+    try testing.expectEqual(Branch.ja, at0000.pillars.hour.branch);
+
+    // 01:00 → 乙丑 (eul/chuk)
+    try testing.expectEqual(Stem.eul, at0100.pillars.hour.stem);
+    try testing.expectEqual(Branch.chuk, at0100.pillars.hour.branch);
 }
 
-test "calculateSaju: lichun boundary 2024-02-03 is 癸卯 year" {
+test "calculateSaju: lichun boundary 2024-02-03 is 癸卯 year, 乙丑 month" {
     const result = try calculateSaju(.{
         .year = 2024,
         .month = 2,
@@ -415,9 +443,12 @@ test "calculateSaju: lichun boundary 2024-02-03 is 癸卯 year" {
     // Before lichun 2024: year is still 癸卯
     try testing.expectEqual(Stem.gye, result.pillars.year.stem);
     try testing.expectEqual(Branch.myo, result.pillars.year.branch);
+    // Month pillar: 乙丑
+    try testing.expectEqual(Stem.eul, result.pillars.month.stem);
+    try testing.expectEqual(Branch.chuk, result.pillars.month.branch);
 }
 
-test "calculateSaju: lichun boundary 2024-02-05 is 甲辰 year" {
+test "calculateSaju: lichun boundary 2024-02-05 is 甲辰 year, 丙寅 month" {
     const result = try calculateSaju(.{
         .year = 2024,
         .month = 2,
@@ -431,6 +462,9 @@ test "calculateSaju: lichun boundary 2024-02-05 is 甲辰 year" {
     // After lichun 2024: year is 甲辰
     try testing.expectEqual(Stem.gap, result.pillars.year.stem);
     try testing.expectEqual(Branch.jin, result.pillars.year.branch);
+    // Month pillar: 丙寅
+    try testing.expectEqual(Stem.byeong, result.pillars.month.stem);
+    try testing.expectEqual(Branch.in_, result.pillars.month.branch);
 }
 
 test "calculateSaju: LMT correction changes hour pillar" {
@@ -468,6 +502,107 @@ test "calculateSaju: LMT correction changes hour pillar" {
     // Verify calculation time is adjusted
     try testing.expectEqual(@as(u8, 4), lmt.normalized.calculation.hour);
     try testing.expectEqual(@as(u8, 57), lmt.normalized.calculation.minute);
+}
+
+test "calculateSaju: seyun ascending order and contains current year" {
+    const current_year: u16 = 2026;
+    const result = try calculateSaju(.{
+        .year = 1992,
+        .month = 10,
+        .day = 24,
+        .hour = 5,
+        .minute = 30,
+        .gender = .male,
+        .calendar = .solar,
+    }, current_year);
+
+    // Seyun years must be strictly ascending
+    var i: usize = 1;
+    while (i < result.seyun.len) : (i += 1) {
+        try testing.expect(result.seyun[i].year > result.seyun[i - 1].year);
+    }
+
+    // Seyun should include the current year
+    var found = false;
+    for (result.seyun) |s| {
+        if (s.year == current_year) {
+            found = true;
+            break;
+        }
+    }
+    try testing.expect(found);
+}
+
+test "calculateSaju: compact output contains key content" {
+    const result = try calculateSaju(.{
+        .year = 1992,
+        .month = 10,
+        .day = 24,
+        .hour = 5,
+        .minute = 30,
+        .gender = .male,
+        .calendar = .solar,
+    }, 2026);
+
+    var buf: [8192]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    try result.writeCompact(fbs.writer(), 2026);
+    const compact = fbs.getWritten();
+
+    // Key sections and content
+    try testing.expect(std.mem.indexOf(u8, compact, "## 원국") != null);
+    try testing.expect(std.mem.indexOf(u8, compact, "## 오행") != null);
+    try testing.expect(std.mem.indexOf(u8, compact, "공망") != null);
+    try testing.expect(std.mem.indexOf(u8, compact, "## 대운") != null);
+    try testing.expect(std.mem.indexOf(u8, compact, "## 세운") != null);
+    try testing.expect(std.mem.indexOf(u8, compact, "## 월운") != null);
+    try testing.expect(std.mem.indexOf(u8, compact, "장간") != null);
+
+    // Day stem with element and yin-yang
+    try testing.expect(std.mem.indexOf(u8, compact, "癸(계)수-") != null);
+    // Geukguk
+    try testing.expect(std.mem.indexOf(u8, compact, "종왕격") != null);
+}
+
+test "calculateSaju: markdown output contains key sections" {
+    const result = try calculateSaju(.{
+        .year = 2001,
+        .month = 11,
+        .day = 3,
+        .hour = 14,
+        .minute = 20,
+        .gender = .male,
+        .calendar = .solar,
+    }, 2026);
+
+    var buf: [16384]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    try result.writeMarkdownFmt(fbs.writer(), 2026);
+    const md = fbs.getWritten();
+
+    // Key markdown sections
+    try testing.expect(std.mem.indexOf(u8, md, "## 사주 원국") != null);
+    try testing.expect(std.mem.indexOf(u8, md, "## 오행 분포") != null);
+    try testing.expect(std.mem.indexOf(u8, md, "## 고급 분석") != null);
+    try testing.expect(std.mem.indexOf(u8, md, "## 대운") != null);
+    try testing.expect(std.mem.indexOf(u8, md, "## 지장간") != null);
+    try testing.expect(std.mem.indexOf(u8, md, "## 공망") != null);
+    try testing.expect(std.mem.indexOf(u8, md, "## 관계 해석") != null);
+}
+
+test "calculateSaju: daeun start age is valid" {
+    const result = try calculateSaju(.{
+        .year = 1970,
+        .month = 1,
+        .day = 7,
+        .hour = 23,
+        .minute = 30,
+        .gender = .male,
+        .calendar = .solar,
+    }, 2026);
+
+    try testing.expect(result.daeun_start_age >= 1);
+    try testing.expect(result.daeun_precise_age > 0);
 }
 
 test {

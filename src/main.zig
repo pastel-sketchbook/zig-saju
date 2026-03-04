@@ -16,6 +16,7 @@ const CliArgs = struct {
     minute: u8 = 0,
     gender: saju.Gender = .male,
     calendar: saju.CalendarType = .solar,
+    leap: bool = false,
     longitude: ?f64 = null,
     lmt: bool = false,
     format: Format = .compact,
@@ -39,6 +40,7 @@ fn printUsage(writer: *std.Io.Writer) !void {
         \\  --minute <MM>       Birth minute (0-59, default: 0)
         \\  --gender <m|f>      Gender: m=male, f=female (default: m)
         \\  --calendar <s|l>    Calendar: s=solar, l=lunar (default: s)
+        \\  --leap              Lunar leap month flag (only with --calendar l)
         \\  --longitude <deg>   Longitude for LMT correction (e.g. 126.9784)
         \\  --lmt               Enable Local Mean Time correction (requires --longitude)
         \\  --format <c|m>      Output: c=compact, m=markdown (default: c)
@@ -102,6 +104,8 @@ fn parseArgs() !CliArgs {
         } else if (std.mem.eql(u8, arg, "--longitude")) {
             const val = args.next() orelse return error.MissingValue;
             cli.longitude = std.fmt.parseFloat(f64, val) catch return error.InvalidLongitude;
+        } else if (std.mem.eql(u8, arg, "--leap")) {
+            cli.leap = true;
         } else if (std.mem.eql(u8, arg, "--lmt")) {
             cli.lmt = true;
         } else if (std.mem.eql(u8, arg, "--format")) {
@@ -222,6 +226,7 @@ pub fn main() !void {
         .minute = cli.minute,
         .gender = cli.gender,
         .calendar = cli.calendar,
+        .leap = cli.leap,
         .longitude = cli.longitude,
         .apply_local_mean_time = cli.lmt,
     };
