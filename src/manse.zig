@@ -263,9 +263,8 @@ pub fn normalizeBirthDate(input: SajuInput) !NormalizedBirth {
         const longitude = input.longitude orelse constants.SEOUL_LONGITUDE;
         const std_longitude = constants.STANDARD_LONGITUDE;
         const offset_minutes = (longitude - std_longitude) * 4.0;
-        const offset_int: i32 = @intFromFloat(@round(offset_minutes));
 
-        const adjusted = addMinutesToDateTime(kst, offset_int);
+        const adjusted = addMinutesToDateTimeFractional(kst, offset_minutes);
         calc = adjusted;
         lmt_info = .{
             .year = adjusted.year,
@@ -310,6 +309,31 @@ fn addMinutesToDateTime(dt: DateTime, offset_minutes: i32) DateTime {
     const remaining = @mod(adjusted, MINUTES_PER_DAY); // 0..1439
     const new_hour: u8 = @intCast(@divFloor(remaining, 60));
     const new_minute: u8 = @intCast(@mod(remaining, 60));
+
+    const new_jdn: u32 = @intCast(@as(i32, @intCast(jdn)) + day_offset);
+    const date = jdnToDate(new_jdn);
+
+    return .{
+        .year = date.year,
+        .month = date.month,
+        .day = date.day,
+        .hour = new_hour,
+        .minute = new_minute,
+    };
+}
+
+/// Adds a fractional minute offset to a DateTime, matching JS Date behavior
+/// (floor for hour/minute extraction after applying the fractional offset).
+fn addMinutesToDateTimeFractional(dt: DateTime, offset_minutes: f64) DateTime {
+    const jdn = klc.LunarSolarConverter.getJulianDayNumber(dt.year, dt.month, dt.day) orelse unreachable;
+    const minutes_from_midnight: f64 = @as(f64, @floatFromInt(dt.hour)) * 60.0 + @as(f64, @floatFromInt(dt.minute));
+    const adjusted = minutes_from_midnight + offset_minutes;
+
+    const day_offset_f = @divFloor(adjusted, @as(f64, MINUTES_PER_DAY));
+    const day_offset: i32 = @intFromFloat(day_offset_f);
+    const remaining = adjusted - day_offset_f * @as(f64, MINUTES_PER_DAY);
+    const new_hour: u8 = @intFromFloat(@floor(remaining / 60.0));
+    const new_minute: u8 = @intFromFloat(@floor(remaining - @as(f64, @floatFromInt(new_hour)) * 60.0));
 
     const new_jdn: u32 = @intCast(@as(i32, @intCast(jdn)) + day_offset);
     const date = jdnToDate(new_jdn);
@@ -490,11 +514,11 @@ test "normalizeBirthDate: LMT correction changes time" {
     };
     const nb = try normalizeBirthDate(input);
     try testing.expect(nb.local_mean_time != null);
-    // LMT offset = (126.9784 - 135) * 4 = -32.0864 minutes ≈ -32 minutes
-    // 05:30 - 32 = 04:58
+    // LMT offset = (126.9784 - 135) * 4 = -32.0864 minutes
+    // 05h30m = 330.0 - 32.0864 = 297.9136 → floor: 4h57m
     const lmt = nb.local_mean_time.?;
     try testing.expectEqual(@as(u8, 4), lmt.hour);
-    try testing.expectEqual(@as(u8, 58), lmt.minute);
+    try testing.expectEqual(@as(u8, 57), lmt.minute);
 }
 
 test "LMT correction changes hour pillar from 乙卯 to 甲寅" {
@@ -503,7 +527,7 @@ test "LMT correction changes hour pillar from 乙卯 to 甲寅" {
     try testing.expectEqual(Stem.eul, p1.hour.stem);
     try testing.expectEqual(Branch.myo, p1.hour.branch);
 
-    // With LMT: adjusted to ~04:58 → 甲寅
+    // With LMT: adjusted to 04:57 → 甲寅
     const input = SajuInput{
         .year = 1992,
         .month = 10,

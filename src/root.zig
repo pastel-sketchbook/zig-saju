@@ -433,6 +433,43 @@ test "calculateSaju: lichun boundary 2024-02-05 is 甲辰 year" {
     try testing.expectEqual(Branch.jin, result.pillars.year.branch);
 }
 
+test "calculateSaju: LMT correction changes hour pillar" {
+    // Without LMT: 1992-10-24 05:30 → hour pillar 乙卯
+    const normal = try calculateSaju(.{
+        .year = 1992,
+        .month = 10,
+        .day = 24,
+        .hour = 5,
+        .minute = 30,
+        .gender = .male,
+        .calendar = .solar,
+    }, 2026);
+
+    try testing.expectEqual(Stem.eul, normal.pillars.hour.stem);
+    try testing.expectEqual(Branch.myo, normal.pillars.hour.branch);
+
+    // With LMT (longitude 126.9784): calculation time → 04:57 → hour pillar 甲寅
+    const lmt = try calculateSaju(.{
+        .year = 1992,
+        .month = 10,
+        .day = 24,
+        .hour = 5,
+        .minute = 30,
+        .gender = .male,
+        .calendar = .solar,
+        .apply_local_mean_time = true,
+        .longitude = 126.9784,
+    }, 2026);
+
+    // LMT shifts time back ~33 minutes, crossing the 寅/卯 boundary
+    try testing.expectEqual(Stem.gap, lmt.pillars.hour.stem);
+    try testing.expectEqual(Branch.in_, lmt.pillars.hour.branch);
+
+    // Verify calculation time is adjusted
+    try testing.expectEqual(@as(u8, 4), lmt.normalized.calculation.hour);
+    try testing.expectEqual(@as(u8, 57), lmt.normalized.calculation.minute);
+}
+
 test {
     testing.refAllDecls(@This());
 }
