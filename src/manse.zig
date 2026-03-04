@@ -46,6 +46,15 @@ fn isDuringKoreaDST(year: u16, month: u8, day: u8, hour: u8, minute: u8) bool {
 /// Converts a KST local datetime to a fractional Julian Day (UTC).
 /// Accounts for Korea DST if applicable.
 fn kstToJulianDay(year: u16, month: u8, day: u8, hour: u8, minute: u8) f64 {
+    return kstToJulianDayImpl(year, month, day, hour, minute);
+}
+
+/// Public version of kstToJulianDay for use by the orchestrator.
+pub fn kstToJulianDayPub(year: u16, month: u8, day: u8, hour: u8, minute: u8) f64 {
+    return kstToJulianDayImpl(year, month, day, hour, minute);
+}
+
+fn kstToJulianDayImpl(year: u16, month: u8, day: u8, hour: u8, minute: u8) f64 {
     const dst_offset: i32 = if (isDuringKoreaDST(year, month, day, hour, minute)) 60 else 0;
     const total_offset_minutes: i32 = constants.BASE_KST_OFFSET_MINUTES + dst_offset;
 

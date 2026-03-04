@@ -280,6 +280,20 @@ pub const LocalMeanTimeInfo = struct {
 };
 
 // =============================
+// Pillar Detail
+// =============================
+
+/// Detailed information for a single pillar.
+pub const PillarDetail = struct {
+    stem: Stem,
+    branch: Branch,
+    hidden_stems: HiddenStems,
+    stem_ten_god: TenGod,
+    /// Ten god of the branch's jeonggi (main hidden stem) relative to day stem.
+    branch_ten_god: TenGod,
+};
+
+// =============================
 // Tests
 // =============================
 

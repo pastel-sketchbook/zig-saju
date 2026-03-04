@@ -456,13 +456,15 @@ pub fn checkStemChung(a: Stem, b: Stem) bool {
     return false;
 }
 
+pub const StemRelationsResult = struct {
+    items: [6]StemRelation,
+    count: u8,
+};
+
 /// Returns all stem relations across the four pillars.
 /// Checks all 6 pillar pair combinations.
 /// Order: [hour, day, month, year] — indices 0-3.
-pub fn getStemRelations(pillars: FourPillars) struct {
-    items: [6]StemRelation,
-    count: u8,
-} {
+pub fn getStemRelations(pillars: FourPillars) StemRelationsResult {
     const keys = [4]PillarKey{ .hour, .day, .month, .year };
     const stems = [4]Stem{ pillars.hour.stem, pillars.day.stem, pillars.month.stem, pillars.year.stem };
     var result: [6]StemRelation = undefined;
