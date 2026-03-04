@@ -4,35 +4,65 @@ tasks:
   default:
     cmds:
       - task --list
+
   fmt:
-    desc: Format Zig code using zig fmt
+    desc: Format Zig source files
     cmds:
       - zig fmt src/
 
+  fmt-check:
+    desc: Check formatting without modifying files
+    cmds:
+      - zig fmt --check src/
+
   test:
-    desc: Run tests using zig build test
+    desc: Run all tests
     cmds:
       - zig build test
 
   build:
-    desc: Build the project using zig build
+    desc: Build the project (formats first)
     deps: [fmt]
     cmds:
       - zig build
 
   run:
-    desc: Build and run the executable
+    desc: Build and run the CLI
     deps: [build]
     cmds:
       - zig build run
 
   check:
-    desc: Run format check and tests without modifying files
+    desc: Run format check and tests (CI-safe, no modifications)
     cmds:
       - zig fmt --check src/
       - zig build test
 
   clean:
-    desc: Clean the build directory
+    desc: Remove build artifacts
     cmds:
       - rm -rf .zig-cache zig-out
+
+  example:
+    desc: Run the golden test case (1992-10-24 05:30 male)
+    deps: [build]
+    cmds:
+      - zig build run -- --year 1992 --month 10 --day 24 --hour 5 --minute 30 --gender m
+
+  example-markdown:
+    desc: Run the golden test case with markdown output
+    deps: [build]
+    cmds:
+      - zig build run -- --year 1992 --month 10 --day 24 --hour 5 --minute 30 --gender m --format m
+
+  example-lunar:
+    desc: Run a lunar calendar example (1992-9-29 lunar = 1992-10-24 solar)
+    deps: [build]
+    cmds:
+      - zig build run -- --year 1992 --month 9 --day 29 --calendar l --gender m
+
+  example-lmt:
+    desc: Run with Local Mean Time correction (Seoul longitude)
+    deps: [build]
+    cmds:
+      - zig build run -- --year 1992 --month 10 --day 24 --hour 5 --minute 30 --longitude 126.9784 --lmt
