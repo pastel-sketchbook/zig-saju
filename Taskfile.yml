@@ -77,6 +77,12 @@ tasks:
     cmds:
       - zig build wasm -Dwasm-optimize=ReleaseSafe
 
+  web:
+    desc: Build WASM and start the test web server (requires Bun)
+    deps: [wasm]
+    cmds:
+      - bun run web/serve.ts
+
   loc:
     desc: Count lines of code with tokei
     cmds:

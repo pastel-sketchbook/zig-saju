@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>zig-saju WASM Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* =============================================
+       60 : 30 : 10  Color Architecture
+       60% — warm paper gradient (body background)
+       30% — cream-white surfaces (form, cards, panels)
+       10% — terracotta accent + amber highlights
+       ============================================= */
+    :root {
+      /* 60% — Dominant: warm paper tones (background only) */
+      --bg-a: #faf6f0;
+      --bg-b: #f5ede0;
+      --bg-c: #fdf8f2;
+      --bg-d: #f0e8d8;
+
+      /* 30% — Secondary: surface containers */
+      --surface: #fffcf7;
+      --card: #f7f1e8;
+      --input-bg: #fffef9;
+      --border: #e5dcd0;
+      --shadow: rgba(120, 100, 70, 0.07);
+
+      /* 10% — Accent: focal points only */
+      --accent: #c0705a;
+      --accent-hover: #a85e4a;
+      --accent-light: rgba(192, 112, 90, 0.10);
+      --highlight: #d4a96a;
+      --gold: #b8860b;
+
+      /* Typography */
+      --text: #3d3229;
+      --text-secondary: #6b5d50;
+      --muted: #9a8e82;
+      --heading: #4a3728;
+
+      /* Semantic */
+      --success-bg: #e8f0e4;
+      --success-text: #4a6741;
+      --error-bg: #f5e0dc;
+      --error-text: #8b3a3a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* === 60%: Background canvas === */
+    body {
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse at 0% 0%, var(--bg-a) 0%, transparent 50%),
+        radial-gradient(ellipse at 100% 0%, var(--bg-b) 0%, transparent 50%),
+        radial-gradient(ellipse at 30% 60%, var(--bg-c) 0%, transparent 50%),
+        radial-gradient(ellipse at 100% 100%, var(--bg-d) 0%, transparent 50%),
+        var(--bg-a);
+      background-attachment: fixed;
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.7;
+      padding: 1.5rem 0;
+      width: 90%;
+      max-width: none;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    /* Typography */
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; color: var(--heading); font-weight: 700; }
+    h2 { font-size: 1.35rem; margin: 1.5rem 0 0.75rem; color: var(--heading); font-weight: 700; }
+    h3 { font-size: 1.1rem; margin-bottom: 0.35rem; color: var(--text-secondary); font-weight: 500; }
+
+    /* Header */
+    header {
+      display: flex; align-items: center; gap: 1rem;
+      padding-bottom: 1rem; border-bottom: 2px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+    header h1 { flex: 1; }
+    .status {
+      font-size: 0.9rem; padding: 0.3rem 0.75rem; border-radius: 20px;
+      background: var(--card); color: var(--muted); border: 1px solid var(--border);
+    }
+    .status.ready { background: var(--success-bg); color: var(--success-text); border-color: #c1d9b8; }
+    .status.error { background: var(--error-bg); color: var(--error-text); border-color: #dcc0b8; }
+
+    /* === 30%: Surface containers === */
+
+    /* Form */
+    form {
+      background: var(--surface);
+      padding: 1.25rem 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .form-row {
+      display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;
+    }
+    .form-row-date label { flex: 1 1 0; min-width: 100px; }
+    .form-row-opts label { flex: 1 1 0; min-width: 120px; }
+    .form-row-opts .checkbox-label { flex: 0 0 auto; }
+    label {
+      font-size: 0.95rem; color: var(--heading); font-weight: 500;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    input, select {
+      background: var(--input-bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: 6px; padding: 0.45rem 0.65rem; font-size: 1rem;
+      width: 100%; height: 2.5rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input[type="checkbox"] { width: auto; height: auto; }
+    input:focus, select:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .checkbox-label { flex-direction: row; align-items: center; gap: 0.5rem; }
+    .form-actions {
+      display: flex; gap: 0.75rem; margin-top: 0.5rem;
+    }
+
+    /* === 10%: Accent — buttons, active highlights === */
+    button {
+      padding: 0.6rem 1.5rem; border: none; border-radius: 8px;
+      font-size: 1rem; cursor: pointer; font-weight: 600;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      box-shadow: 0 2px 6px rgba(192, 112, 90, 0.25);
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 3px 10px rgba(192, 112, 90, 0.35);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: var(--surface); color: var(--heading);
+      border: 1.5px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--card); border-color: var(--highlight); }
+    .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Error */
+    .error-display {
+      background: var(--error-bg); color: var(--error-text);
+      padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;
+      border-left: 4px solid var(--error-text);
+    }
+
+    /* Pillars table — 30% surface + 10% accent on hanja */
+    .pillars-table {
+      width: 100%; border-collapse: separate; border-spacing: 0;
+      text-align: center; background: var(--surface);
+      border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .pillars-table th {
+      padding: 0.6rem; font-size: 0.95rem; font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--card); border-bottom: 1px solid var(--border);
+    }
+    .pillars-table td { padding: 0.75rem; }
+    .stem-row td { font-size: 2.2rem; font-weight: 700; color: var(--accent); }
+    .branch-row td { font-size: 2.2rem; font-weight: 700; color: var(--heading); }
+    .tengod-row td { font-size: 0.9rem; color: var(--text-secondary); }
+
+    /* Summary grid — 30% cards + 10% accent left-border */
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem; margin: 1rem 0;
+    }
+    .summary-card {
+      background: var(--surface); padding: 1rem; border-radius: 10px;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      box-shadow: 0 1px 4px var(--shadow);
+      transition: box-shadow 0.15s, transform 0.15s;
+    }
+    .summary-card:hover {
+      box-shadow: 0 3px 12px var(--shadow);
+      transform: translateY(-1px);
+    }
+    .summary-card p { font-size: 0.95rem; color: var(--text-secondary); margin-top: 0.25rem; }
+    .big-char { font-size: 1.75rem; font-weight: 700; color: var(--accent); }
+
+    /* Daeun timeline — 30% cards + 10% accent on pillar chars */
+    .daeun-timeline {
+      display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.5rem 0 0.75rem;
+    }
+    .daeun-item {
+      flex: 0 0 auto; width: 82px; text-align: center;
+      background: var(--surface); border-radius: 10px; padding: 0.6rem 0.4rem;
+      border: 1px solid var(--border);
+      transition: box-shadow 0.15s, transform 0.15s;
+    }
+    .daeun-item:hover {
+      box-shadow: 0 3px 10px var(--shadow);
+      transform: translateY(-2px);
+    }
+    .daeun-age { font-size: 0.8rem; color: var(--text-secondary); }
+    .daeun-pillar { font-size: 1.4rem; font-weight: 700; color: var(--accent); margin: 0.15rem 0; }
+    .daeun-meta { font-size: 0.75rem; color: var(--muted); }
+    .daeun-year { font-size: 0.8rem; color: var(--muted); }
+
+    /* Interpret section */
+    #interpret-section { margin-top: 1.5rem; }
+    #interpret-output {
+      background: var(--surface); padding: 1.25rem; border-radius: 12px;
+      white-space: pre-wrap; font-size: 1rem; line-height: 1.8;
+      max-height: 500px; overflow-y: auto; margin-top: 0.75rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* JSON collapsible */
+    details { margin-top: 1.5rem; }
+    details summary {
+      cursor: pointer; color: var(--text-secondary); font-size: 0.95rem;
+      font-weight: 500; padding: 0.5rem 0;
+    }
+    pre {
+      background: var(--surface); padding: 1.25rem; border-radius: 10px;
+      overflow-x: auto; font-size: 0.85rem; max-height: 400px; overflow-y: auto;
+      margin-top: 0.5rem; border: 1px solid var(--border);
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>zig-saju WASM</h1>
+    <span id="status" class="status">Initializing...</span>
+  </header>
+
+  <form id="saju-form">
+    <div class="form-row form-row-date">
+      <label>Year  <input name="year" type="number" min="1900" max="2050" value="1992" required /></label>
+      <label>Month <input name="month" type="number" min="1" max="12" value="10" required /></label>
+      <label>Day   <input name="day" type="number" min="1" max="31" value="24" required /></label>
+      <label>Hour  <input name="hour" type="number" min="0" max="23" value="5" required /></label>
+      <label>Minute<input name="minute" type="number" min="0" max="59" value="30" required /></label>
+    </div>
+    <div class="form-row form-row-opts">
+      <label>Gender
+        <select name="gender"><option value="male">Male (남)</option><option value="female">Female (여)</option></select>
+      </label>
+      <label>Calendar
+        <select name="calendar"><option value="solar">Solar (양력)</option><option value="lunar">Lunar (음력)</option></select>
+      </label>
+      <label class="checkbox-label"><input name="leap" type="checkbox" /> Leap month (윤달)</label>
+      <label class="checkbox-label"><input name="lmt" type="checkbox" /> Local Mean Time</label>
+      <label>Longitude <input name="longitude" type="number" step="0.0001" placeholder="126.9784" /></label>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Calculate (계산)</button>
+      <button type="button" id="interpret-btn" class="btn-secondary" disabled>Interpret with AI (풀이)</button>
+    </div>
+  </form>
+
+  <div id="error-display" class="error-display" hidden></div>
+
+  <div id="result-section" hidden>
+    <div id="pillars-display"></div>
+    <div id="summary-display"></div>
+    <div id="daeun-display"></div>
+
+    <div id="interpret-section" hidden>
+      <h2>AI Interpretation (사주 풀이)</h2>
+      <div id="interpret-output"></div>
+    </div>
+
+    <details>
+      <summary>Raw JSON output</summary>
+      <pre id="json-output"></pre>
+    </details>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
