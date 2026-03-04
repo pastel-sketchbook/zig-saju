@@ -54,6 +54,33 @@ fn writePillarToken(writer: anytype, stem: Stem, branch: Branch, comptime which:
     }
 }
 
+/// Writes daeun special sals as comma-separated names, or "-" if none.
+fn writeDaeunSals(writer: anytype, sals: analyze.SpecialSals) !void {
+    if (!sals.any()) {
+        try writer.writeByte('-');
+        return;
+    }
+    var first = true;
+    if (sals.cheonEulGwiin) {
+        try writer.writeAll("천을귀인");
+        first = false;
+    }
+    if (sals.yeokma) {
+        if (!first) try writer.writeByte(',');
+        try writer.writeAll("역마살");
+        first = false;
+    }
+    if (sals.dohwa) {
+        if (!first) try writer.writeByte(',');
+        try writer.writeAll("도화살");
+        first = false;
+    }
+    if (sals.hwagae) {
+        if (!first) try writer.writeByte(',');
+        try writer.writeAll("화개살");
+    }
+}
+
 fn writeHiddenStem(writer: anytype, hs: HiddenStems) !void {
     if (hs.yeogi) |y| {
         try writer.writeAll(y.hanja());
@@ -334,11 +361,13 @@ pub fn writeCompactText(
         try writer.print(" {d}({d}) ", .{ d.start_age, d.start_year });
         try writer.writeAll(d.pillar.stem.hanja());
         try writer.writeAll(d.pillar.branch.hanja());
-        try writer.print(" {s}/{s} {s}\n", .{
+        try writer.print(" {s}/{s} {s} ", .{
             d.stem_ten_god.korean(),
             d.branch_ten_god.korean(),
             d.twelve_stage.korean(),
         });
+        try writeDaeunSals(writer, d.sals);
+        try writer.writeByte('\n');
     }
 
     // ## 세운
@@ -658,10 +687,10 @@ pub fn writeMarkdown(
     try writer.writeAll("\n## 대운\n\n");
     try writer.print("- 방향: {s}\n", .{if (daeun_forward) "순행" else "역행"});
     try writer.print("- 시작 나이: {d}세\n\n", .{daeun_start_age});
-    try writer.writeAll("| 나이 | 간지 | 천간십성 | 지지십성 | 12운성 |\n");
-    try writer.writeAll("|---|---|---|---|---|\n");
+    try writer.writeAll("| 나이 | 간지 | 천간십성 | 지지십성 | 12운성 | 신살 |\n");
+    try writer.writeAll("|---|---|---|---|---|---|\n");
     for (daeun) |d| {
-        try writer.print("| {d}~{d} | {s}{s} | {s} | {s} | {s} |\n", .{
+        try writer.print("| {d}~{d} | {s}{s} | {s} | {s} | {s} | ", .{
             d.start_age,
             d.end_age,
             d.pillar.stem.hanja(),
@@ -670,6 +699,8 @@ pub fn writeMarkdown(
             d.branch_ten_god.korean(),
             d.twelve_stage.korean(),
         });
+        try writeDaeunSals(writer, d.sals);
+        try writer.writeAll(" |\n");
     }
 
     // ## 세운

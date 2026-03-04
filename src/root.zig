@@ -317,6 +317,7 @@ pub fn calculateSaju(input: SajuInput, current_year: u16) CalculateError!SajuRes
         daeun_info.start_age,
         normalized.solar.year,
         day_stem,
+        pillars.day.branch,
     );
 
     // 12. Seyun + Wolun

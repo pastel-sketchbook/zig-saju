@@ -278,6 +278,7 @@ pub const DaeunItem = struct {
     stem_ten_god: TenGod,
     branch_ten_god: TenGod,
     twelve_stage: constants.TwelveStage,
+    sals: SpecialSals,
 };
 
 /// Builds the 10 daeun items.
@@ -287,6 +288,7 @@ pub fn buildDaeunList(
     start_age: u8,
     birth_solar_year: u16,
     day_stem: Stem,
+    day_branch: Branch,
 ) [10]DaeunItem {
     var list: [10]DaeunItem = undefined;
     const month_stem_idx: i8 = @intCast(@intFromEnum(month_pillar.stem));
@@ -310,6 +312,7 @@ pub fn buildDaeunList(
             .stem_ten_god = constants.getTenGod(day_stem, stem),
             .branch_ten_god = constants.getTenGod(day_stem, branch_hidden.jeonggi),
             .twelve_stage = constants.getTwelveStageBong(day_stem, branch),
+            .sals = calculateSpecialSals(day_stem, day_branch, branch),
         };
     }
     return list;
@@ -1128,13 +1131,34 @@ test "special sals: cheonEulGwiin for 癸 is 卯,巳" {
 
 test "buildDaeunList produces 10 items" {
     const month_pillar = Pillar{ .stem = .gyeong, .branch = .sul };
-    const list = buildDaeunList(month_pillar, true, 3, 1992, .gye);
+    const list = buildDaeunList(month_pillar, true, 3, 1992, .gye, .yu);
     try testing.expectEqual(@as(u16, 3), list[0].start_age);
     try testing.expectEqual(@as(u16, 12), list[0].end_age);
     try testing.expectEqual(@as(u16, 13), list[1].start_age);
     // First forward from 庚戌: stem=(庚+1)%10=辛, branch=(戌+1)%12=亥
     try testing.expectEqual(Stem.sin, list[0].pillar.stem);
     try testing.expectEqual(Branch.hae, list[0].pillar.branch);
+}
+
+test "buildDaeunList: daeun items have per-pillar sals" {
+    // Golden case: day stem 癸, day branch 酉, month pillar 庚戌, forward
+    const month_pillar = Pillar{ .stem = .gyeong, .branch = .sul };
+    const list = buildDaeunList(month_pillar, true, 3, 1992, .gye, .yu);
+
+    // 천을귀인 for 癸 = [卯, 巳]
+    // 역마 for 酉 = 卯
+    // 도화 for 酉 = 午
+    // 화개 for 酉 = 丑
+
+    // First daeun branch = 亥: check sals
+    // 亥 is not in [卯,巳] (no 천을귀인), 역마(卯)≠亥, 도화(午)≠亥, 화개(丑)≠亥
+    try testing.expect(!list[0].sals.any());
+
+    // Let's check all 10 items for 卯 (index where branch=myo)
+    // Forward from 戌: +1=亥, +2=子, +3=丑, +4=寅, +5=卯, ...
+    // Index 4 has branch 卯: 천을귀인(卯∈[卯,巳])=true, 역마(卯)=true
+    try testing.expect(list[4].sals.cheonEulGwiin);
+    try testing.expect(list[4].sals.yeokma);
 }
 
 test "buildSeyunList produces items with correct stems" {
