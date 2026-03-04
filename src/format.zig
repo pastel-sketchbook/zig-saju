@@ -126,6 +126,8 @@ pub fn writeCompactText(
     daeun: [10]analyze.DaeunItem,
     seyun: [10]analyze.SeyunItem,
     wolun: [12]analyze.WolunItem,
+    relation_priorities: analyze.RelationPriorities,
+    caution_points: analyze.CautionPoints,
     current_year: u16,
 ) !void {
     const day_stem = pillars.day.stem;
@@ -396,6 +398,31 @@ pub fn writeCompactText(
             w.twelve_stage.korean(),
         });
     }
+
+    // ## 관계 강도
+    try writer.writeAll("\n## 관계 강도\n");
+    if (relation_priorities.count > 0) {
+        for (0..relation_priorities.count) |i| {
+            const item = relation_priorities.items[i];
+            const whole = item.score_x10 / 10;
+            const frac = item.score_x10 % 10;
+            try writer.print("{d}순위 {s} ({d}.{d}): {s}\n", .{
+                i + 1,
+                item.label,
+                whole,
+                frac,
+                item.note,
+            });
+        }
+    } else {
+        try writer.writeAll("특이 관계 신호 없음\n");
+    }
+
+    // ## 주의 포인트
+    try writer.writeAll("\n## 주의 포인트\n");
+    for (0..caution_points.count) |i| {
+        try writer.print("- {s}\n", .{caution_points.items[i]});
+    }
 }
 
 // =============================
@@ -426,6 +453,8 @@ pub fn writeMarkdown(
     daeun: [10]analyze.DaeunItem,
     seyun: [10]analyze.SeyunItem,
     wolun: [12]analyze.WolunItem,
+    relation_priorities: analyze.RelationPriorities,
+    caution_points: analyze.CautionPoints,
     current_year: u16,
     interpretation: []const u8,
 ) !void {
@@ -683,6 +712,31 @@ pub fn writeMarkdown(
         }
     }
 
+    // ## 관계 강도 (우선순위)
+    try writer.writeAll("\n## 관계 강도 (우선순위)\n\n");
+    if (relation_priorities.count > 0) {
+        for (0..relation_priorities.count) |i| {
+            const item = relation_priorities.items[i];
+            const whole = item.score_x10 / 10;
+            const frac = item.score_x10 % 10;
+            try writer.print("- {d}순위 {s} (점수 {d}.{d}): {s}\n", .{
+                i + 1,
+                item.label,
+                whole,
+                frac,
+                item.note,
+            });
+        }
+    } else {
+        try writer.writeAll("- 특이 관계 신호 없음\n");
+    }
+
+    // ## 해석 시 주의 포인트 (충/형 중심)
+    try writer.writeAll("\n## 해석 시 주의 포인트 (충/형 중심)\n\n");
+    for (0..caution_points.count) |i| {
+        try writer.print("- {s}\n", .{caution_points.items[i]});
+    }
+
     // ## 대운
     try writer.writeAll("\n## 대운\n\n");
     try writer.print("- 방향: {s}\n", .{if (daeun_forward) "순행" else "역행"});
@@ -784,6 +838,8 @@ test "writeCompactText: produces output for golden case" {
         result.daeun,
         result.seyun,
         result.wolun,
+        result.relation_priorities,
+        result.caution_points,
         2026,
     );
 
@@ -796,6 +852,8 @@ test "writeCompactText: produces output for golden case" {
     try testing.expect(std.mem.indexOf(u8, output, "## 대운") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 세운") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 월운") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "## 관계 강도") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "## 주의 포인트") != null);
 }
 
 test "writeMarkdown: produces output for golden case" {
@@ -835,6 +893,8 @@ test "writeMarkdown: produces output for golden case" {
         result.daeun,
         result.seyun,
         result.wolun,
+        result.relation_priorities,
+        result.caution_points,
         2026,
         result.interpretation(),
     );
@@ -846,4 +906,6 @@ test "writeMarkdown: produces output for golden case" {
     try testing.expect(std.mem.indexOf(u8, output, "## 지장간") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 오행 분포") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 대운") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "## 관계 강도 (우선순위)") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "## 해석 시 주의 포인트") != null);
 }

@@ -938,6 +938,187 @@ pub fn calculateAdvancedSinsal(
 }
 
 // =============================
+// Relation Priority Scoring
+// =============================
+
+/// A single scored relation priority item.
+pub const RelationPriorityItem = struct {
+    label: []const u8,
+    /// Score × 10 to avoid floats (e.g. 48 = 4.8)
+    score_x10: u16,
+    note: []const u8,
+};
+
+/// Weight rules for branch relation types (weight × 10 to stay integer).
+const BRANCH_REL_WEIGHTS = [10]struct { rel_type: BranchRelationType, label: []const u8, weight_x10: u16, note: []const u8 }{
+    .{ .rel_type = .chung, .label = "지지 충", .weight_x10 = 50, .note = "급변/충돌 가능성" },
+    .{ .rel_type = .hyeong, .label = "지지 형", .weight_x10 = 45, .note = "긴장/소모 누적 가능성" },
+    .{ .rel_type = .pa, .label = "지지 파", .weight_x10 = 35, .note = "관계 균열/계획 변동 가능성" },
+    .{ .rel_type = .hae, .label = "지지 해", .weight_x10 = 30, .note = "오해/소통 불일치 가능성" },
+    .{ .rel_type = .wonjin, .label = "지지 원진", .weight_x10 = 28, .note = "감정적 피로 누적 가능성" },
+    .{ .rel_type = .gwimun, .label = "지지 귀문", .weight_x10 = 28, .note = "심리적 예민/내적 갈등 가능성" },
+    .{ .rel_type = .samhap, .label = "지지 삼합", .weight_x10 = 26, .note = "기운 결집/확장 포인트" },
+    .{ .rel_type = .banghap, .label = "지지 방합", .weight_x10 = 24, .note = "방향성/세력화 포인트" },
+    .{ .rel_type = .yukhap, .label = "지지 육합", .weight_x10 = 22, .note = "협력/완충 포인트" },
+    .{ .rel_type = .banhap, .label = "지지 반합", .weight_x10 = 18, .note = "조건부 협력 포인트" },
+};
+
+/// Result of relation priority scoring.
+pub const RelationPriorities = struct {
+    items: [12]RelationPriorityItem, // max: 2 stem + 10 branch types
+    count: u8,
+};
+
+/// Builds scored relation priorities from stem and branch relations.
+/// Items are sorted by descending score.
+pub fn buildRelationPriorities(
+    stem_relations: StemRelationsResult,
+    branch_relations: BranchRelations,
+) RelationPriorities {
+    var result = RelationPriorities{ .items = undefined, .count = 0 };
+
+    // Stem 충 (weight 4.8 per count → 48 per count in x10)
+    var stem_chung_count: u16 = 0;
+    for (0..stem_relations.count) |i| {
+        if (stem_relations.items[i].rel_type == .chung) stem_chung_count += 1;
+    }
+    if (stem_chung_count > 0) {
+        result.items[result.count] = .{
+            .label = "천간 충",
+            .score_x10 = stem_chung_count * 48,
+            .note = "의사결정/대인 충돌 가능성",
+        };
+        result.count += 1;
+    }
+
+    // Stem 합 (weight 2.0 per count → 20 per count in x10)
+    var stem_hap_count: u16 = 0;
+    for (0..stem_relations.count) |i| {
+        if (stem_relations.items[i].rel_type == .hap) stem_hap_count += 1;
+    }
+    if (stem_hap_count > 0) {
+        result.items[result.count] = .{
+            .label = "천간 합",
+            .score_x10 = stem_hap_count * 20,
+            .note = "완충/협력 가능성",
+        };
+        result.count += 1;
+    }
+
+    // Branch relations — count occurrences of each type across pairs and triples
+    for (BRANCH_REL_WEIGHTS) |rule| {
+        var count: u16 = 0;
+
+        // Count pair relations of this type
+        for (0..branch_relations.pair_count) |i| {
+            if (branch_relations.pairs[i].rel_type == rule.rel_type) count += 1;
+        }
+
+        // Count triple relations of this type
+        for (0..branch_relations.triple_count) |i| {
+            if (branch_relations.triples[i].rel_type == rule.rel_type) count += 1;
+        }
+
+        if (count > 0) {
+            result.items[result.count] = .{
+                .label = rule.label,
+                .score_x10 = rule.weight_x10 * count,
+                .note = rule.note,
+            };
+            result.count += 1;
+        }
+    }
+
+    // Sort by descending score (insertion sort — small N)
+    var i: u8 = 1;
+    while (i < result.count) : (i += 1) {
+        const key = result.items[i];
+        var j: u8 = i;
+        while (j > 0 and result.items[j - 1].score_x10 < key.score_x10) : (j -= 1) {
+            result.items[j] = result.items[j - 1];
+        }
+        result.items[j] = key;
+    }
+
+    return result;
+}
+
+/// Caution points text — up to 5 advisory strings.
+pub const CautionPoints = struct {
+    items: [5][]const u8,
+    count: u8,
+};
+
+/// Builds caution points from stem and branch relations.
+/// Generates advisory text for 충, 형, 파 relations.
+pub fn buildCautionPoints(
+    stem_relations: StemRelationsResult,
+    branch_relations: BranchRelations,
+) CautionPoints {
+    var result = CautionPoints{ .items = undefined, .count = 0 };
+
+    // Stem 충
+    var has_stem_chung = false;
+    for (0..stem_relations.count) |i| {
+        if (stem_relations.items[i].rel_type == .chung) {
+            has_stem_chung = true;
+            break;
+        }
+    }
+    if (has_stem_chung) {
+        result.items[result.count] = "천간 충 -> 의사결정과 대인 대응에서 정면충돌을 피하고 완충 장치를 두는 것이 좋습니다.";
+        result.count += 1;
+    }
+
+    // Branch 충
+    var has_branch_chung = false;
+    for (0..branch_relations.pair_count) |i| {
+        if (branch_relations.pairs[i].rel_type == .chung) {
+            has_branch_chung = true;
+            break;
+        }
+    }
+    if (has_branch_chung) {
+        result.items[result.count] = "지지 충 -> 일정 급변, 역할 충돌, 관계 긴장 국면에 대비가 필요합니다.";
+        result.count += 1;
+    }
+
+    // Branch 형
+    var has_branch_hyeong = false;
+    for (0..branch_relations.pair_count) |i| {
+        if (branch_relations.pairs[i].rel_type == .hyeong) {
+            has_branch_hyeong = true;
+            break;
+        }
+    }
+    if (has_branch_hyeong) {
+        result.items[result.count] = "지지 형 -> 압박/피로 누적 구간이 생기기 쉬워 갈등 확대 전에 조정이 필요합니다.";
+        result.count += 1;
+    }
+
+    // Branch 파
+    var has_branch_pa = false;
+    for (0..branch_relations.pair_count) |i| {
+        if (branch_relations.pairs[i].rel_type == .pa) {
+            has_branch_pa = true;
+            break;
+        }
+    }
+    if (has_branch_pa) {
+        result.items[result.count] = "지지 파 -> 계획의 균열이나 기대치 차이로 인한 이탈 신호를 점검하세요.";
+        result.count += 1;
+    }
+
+    // Fallback if no strong signals
+    if (result.count == 0) {
+        result.items[0] = "충/형 중심의 강한 충돌 신호는 상대적으로 약합니다. 다만 시기운(세운/월운) 중복 시 재점검이 필요합니다.";
+        result.count = 1;
+    }
+
+    return result;
+}
+
+// =============================
 // Interpretation Text
 // =============================
 
@@ -1320,6 +1501,186 @@ test "advanced sinsal: 양인 for 甲 day stem with 卯 day branch" {
         if (std.mem.eql(u8, sinsal.hyungsin[i], "양인")) found = true;
     }
     try testing.expect(found);
+}
+
+// =============================
+// Relation Priority & Caution Tests
+// =============================
+
+test "buildRelationPriorities: empty relations yields empty result" {
+    const stem_rels = StemRelationsResult{ .items = undefined, .count = 0 };
+    const branch_rels = BranchRelations{
+        .pairs = undefined,
+        .pair_count = 0,
+        .triples = undefined,
+        .triple_count = 0,
+    };
+    const result = buildRelationPriorities(stem_rels, branch_rels);
+    try testing.expectEqual(@as(u8, 0), result.count);
+}
+
+test "buildRelationPriorities: stem chung scores 48 per hit" {
+    // Craft a StemRelationsResult with 1 stem chung
+    var stem_rels = StemRelationsResult{ .items = undefined, .count = 1 };
+    stem_rels.items[0] = .{
+        .rel_type = .chung,
+        .pillar_a = .year,
+        .pillar_b = .day,
+        .stem_a = .gap,
+        .stem_b = .gyeong,
+        .hap_element = null,
+    };
+    const branch_rels = BranchRelations{
+        .pairs = undefined,
+        .pair_count = 0,
+        .triples = undefined,
+        .triple_count = 0,
+    };
+    const result = buildRelationPriorities(stem_rels, branch_rels);
+    try testing.expectEqual(@as(u8, 1), result.count);
+    try testing.expectEqualStrings("천간 충", result.items[0].label);
+    try testing.expectEqual(@as(u16, 48), result.items[0].score_x10);
+}
+
+test "buildRelationPriorities: stem hap scores 20 per hit" {
+    var stem_rels = StemRelationsResult{ .items = undefined, .count = 1 };
+    stem_rels.items[0] = .{
+        .rel_type = .hap,
+        .pillar_a = .year,
+        .pillar_b = .day,
+        .stem_a = .gap,
+        .stem_b = .gi,
+        .hap_element = .earth,
+    };
+    const branch_rels = BranchRelations{
+        .pairs = undefined,
+        .pair_count = 0,
+        .triples = undefined,
+        .triple_count = 0,
+    };
+    const result = buildRelationPriorities(stem_rels, branch_rels);
+    try testing.expectEqual(@as(u8, 1), result.count);
+    try testing.expectEqualStrings("천간 합", result.items[0].label);
+    try testing.expectEqual(@as(u16, 20), result.items[0].score_x10);
+}
+
+test "buildRelationPriorities: branch chung pair scores 50" {
+    var branch_rels = BranchRelations{
+        .pairs = undefined,
+        .pair_count = 1,
+        .triples = undefined,
+        .triple_count = 0,
+    };
+    branch_rels.pairs[0] = .{
+        .rel_type = .chung,
+        .pillar_a = .year,
+        .pillar_b = .day,
+        .branch_a = .ja,
+        .branch_b = .o,
+    };
+    const stem_rels = StemRelationsResult{ .items = undefined, .count = 0 };
+    const result = buildRelationPriorities(stem_rels, branch_rels);
+    try testing.expectEqual(@as(u8, 1), result.count);
+    try testing.expectEqualStrings("지지 충", result.items[0].label);
+    try testing.expectEqual(@as(u16, 50), result.items[0].score_x10);
+}
+
+test "buildRelationPriorities: sorted by descending score" {
+    // stem chung (48) + branch yukhap (22) → chung should be first
+    var stem_rels = StemRelationsResult{ .items = undefined, .count = 1 };
+    stem_rels.items[0] = .{
+        .rel_type = .chung,
+        .pillar_a = .year,
+        .pillar_b = .day,
+        .stem_a = .gap,
+        .stem_b = .gyeong,
+        .hap_element = null,
+    };
+    var branch_rels = BranchRelations{
+        .pairs = undefined,
+        .pair_count = 1,
+        .triples = undefined,
+        .triple_count = 0,
+    };
+    branch_rels.pairs[0] = .{
+        .rel_type = .yukhap,
+        .pillar_a = .month,
+        .pillar_b = .hour,
+        .branch_a = .ja,
+        .branch_b = .chuk,
+    };
+    const result = buildRelationPriorities(stem_rels, branch_rels);
+    try testing.expectEqual(@as(u8, 2), result.count);
+    // stem chung (48) > yukhap (22)
+    try testing.expectEqualStrings("천간 충", result.items[0].label);
+    try testing.expectEqualStrings("지지 육합", result.items[1].label);
+    try testing.expect(result.items[0].score_x10 > result.items[1].score_x10);
+}
+
+test "buildRelationPriorities: golden case has entries" {
+    const pillars = manse.calculateFourPillars(1992, 10, 24, 5, 30);
+    const stem_rels = getStemRelations(pillars);
+    const branch_rels = getBranchRelations(pillars);
+    const result = buildRelationPriorities(stem_rels, branch_rels);
+    // The golden case should have at least some relations
+    try testing.expect(result.count > 0);
+    // Verify scores are descending
+    var i: u8 = 1;
+    while (i < result.count) : (i += 1) {
+        try testing.expect(result.items[i - 1].score_x10 >= result.items[i].score_x10);
+    }
+}
+
+test "buildCautionPoints: no strong signals yields fallback" {
+    const stem_rels = StemRelationsResult{ .items = undefined, .count = 0 };
+    const branch_rels = BranchRelations{
+        .pairs = undefined,
+        .pair_count = 0,
+        .triples = undefined,
+        .triple_count = 0,
+    };
+    const result = buildCautionPoints(stem_rels, branch_rels);
+    try testing.expectEqual(@as(u8, 1), result.count);
+    try testing.expect(std.mem.startsWith(u8, result.items[0], "충/형"));
+}
+
+test "buildCautionPoints: stem chung triggers first point" {
+    var stem_rels = StemRelationsResult{ .items = undefined, .count = 1 };
+    stem_rels.items[0] = .{
+        .rel_type = .chung,
+        .pillar_a = .year,
+        .pillar_b = .day,
+        .stem_a = .gap,
+        .stem_b = .gyeong,
+        .hap_element = null,
+    };
+    const branch_rels = BranchRelations{
+        .pairs = undefined,
+        .pair_count = 0,
+        .triples = undefined,
+        .triple_count = 0,
+    };
+    const result = buildCautionPoints(stem_rels, branch_rels);
+    try testing.expectEqual(@as(u8, 1), result.count);
+    try testing.expect(std.mem.startsWith(u8, result.items[0], "천간 충"));
+}
+
+test "buildCautionPoints: branch chung+hyeong+pa yields 3 points" {
+    var branch_rels = BranchRelations{
+        .pairs = undefined,
+        .pair_count = 3,
+        .triples = undefined,
+        .triple_count = 0,
+    };
+    branch_rels.pairs[0] = .{ .rel_type = .chung, .pillar_a = .year, .pillar_b = .day, .branch_a = .ja, .branch_b = .o };
+    branch_rels.pairs[1] = .{ .rel_type = .hyeong, .pillar_a = .month, .pillar_b = .hour, .branch_a = .in_, .branch_b = .sa };
+    branch_rels.pairs[2] = .{ .rel_type = .pa, .pillar_a = .year, .pillar_b = .hour, .branch_a = .ja, .branch_b = .yu };
+    const stem_rels = StemRelationsResult{ .items = undefined, .count = 0 };
+    const result = buildCautionPoints(stem_rels, branch_rels);
+    try testing.expectEqual(@as(u8, 3), result.count);
+    try testing.expect(std.mem.startsWith(u8, result.items[0], "지지 충"));
+    try testing.expect(std.mem.startsWith(u8, result.items[1], "지지 형"));
+    try testing.expect(std.mem.startsWith(u8, result.items[2], "지지 파"));
 }
 
 // =============================

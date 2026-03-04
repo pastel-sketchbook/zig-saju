@@ -82,6 +82,12 @@ pub const StemRelationsResult = analyze.StemRelationsResult;
 pub const BranchRelations = analyze.BranchRelations;
 /// Advanced sinsal: gilsin (길신) and hyungsin (흉신) lists.
 pub const AdvancedSinsal = analyze.AdvancedSinsal;
+/// Scored relation priority item.
+pub const RelationPriorityItem = analyze.RelationPriorityItem;
+/// Relation priorities sorted by descending score.
+pub const RelationPriorities = analyze.RelationPriorities;
+/// Advisory caution points derived from strong relations.
+pub const CautionPoints = analyze.CautionPoints;
 
 // =============================
 // SajuResult — Complete analysis result
@@ -136,6 +142,12 @@ pub const SajuResult = struct {
 
     /// Advanced sinsal.
     advanced_sinsal: AdvancedSinsal,
+
+    /// Relation priorities (scored and sorted by descending weight).
+    relation_priorities: RelationPriorities,
+
+    /// Caution points (advisory text strings for strong clashes).
+    caution_points: CautionPoints,
 
     /// Daeun direction (true = forward/순행).
     daeun_forward: bool,
@@ -198,6 +210,8 @@ pub const SajuResult = struct {
             self.daeun,
             self.seyun,
             self.wolun,
+            self.relation_priorities,
+            self.caution_points,
             current_year,
         );
     }
@@ -227,6 +241,8 @@ pub const SajuResult = struct {
             self.daeun,
             self.seyun,
             self.wolun,
+            self.relation_priorities,
+            self.caution_points,
             current_year,
             self.interpretation(),
         );
@@ -307,6 +323,10 @@ pub fn calculateSaju(input: SajuInput, current_year: u16) CalculateError!SajuRes
         day_stem,
     );
 
+    // 10b. Relation priorities and caution points
+    const rel_priorities = analyze.buildRelationPriorities(stem_rels, branch_rels);
+    const caution_pts = analyze.buildCautionPoints(stem_rels, branch_rels);
+
     // 11. Daeun
     const daeun_forward = analyze.isDaeunForward(pillars.year.stem, input.gender);
     const birth_jd = manse.kstToJulianDayPub(calc.year, calc.month, calc.day, calc.hour, calc.minute);
@@ -345,6 +365,8 @@ pub fn calculateSaju(input: SajuInput, current_year: u16) CalculateError!SajuRes
         .geukguk = geukguk,
         .yongsin = yongsin,
         .advanced_sinsal = adv_sinsal,
+        .relation_priorities = rel_priorities,
+        .caution_points = caution_pts,
         .daeun_forward = daeun_forward,
         .daeun_start_age = daeun_info.start_age,
         .daeun_precise_age = daeun_info.precise_age,
