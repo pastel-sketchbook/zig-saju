@@ -24,6 +24,8 @@ Lunar-solar calendar conversion is provided by **[zig-klc](https://github.com/ch
 - Daeun (대운), seyun (세운), wolun (월운)
 - Twelve sals (12신살) and special sals (특수신살)
 - Compact text output (LLM-friendly) and Markdown table output
+- Relation priority scoring and caution points
+- Manse reference codes (만세력) for 6 key dates
 - CLI with full option support
 - Korea DST handling (1960, 1987--1988)
 - Local Mean Time (LMT) correction
@@ -93,7 +95,7 @@ const input = saju.SajuInput{
     .calendar = .solar,
 };
 
-const result = try saju.calculateSaju(input, 2026);
+const result = try saju.calculateSaju(input, 2026, ref_time);
 
 // Write compact output (LLM-friendly)
 result.writeCompact(writer, 2026);
@@ -110,7 +112,7 @@ zig build test
 task test
 ```
 
-66 tests covering:
+80 tests covering:
 - Constants: ten gods, hidden stems, twelve stages, month branches, solar term data
 - Manse: four pillars calculation, Lichun boundary, hour boundaries, LMT correction, lunar-solar equivalence
 - Analyze: gongmang, five elements, twelve sals, special sals, day strength, geukguk, yongsin, daeun, seyun, wolun, stem/branch relations
@@ -139,11 +141,7 @@ zig-saju/
 |:--|:--|:--|
 | Timezone | Arbitrary `Intl.DateTimeFormat` | KST only (UTC+9) |
 | Ten gods | 10x10 lookup table | Algorithmic computation |
-| `now` injection | Supported for testing | Uses system clock |
-| Relation priority scoring | Included in format output | Not ported |
-| Current daeun marking | Shows remaining years | Daeun list without "current" tracking |
-| Per-pillar daeun sals | Included | Not ported |
-| Manse reference codes | "이달/다음달/오늘/내일" | Not ported |
+| `now` injection | Supported for testing | `ref_time: DateTime` parameter on `calculateSaju` |
 | `solarToLunar`/`lunarToSolar` | Exported as top-level API | Available via zig-klc directly |
 
 ## License
