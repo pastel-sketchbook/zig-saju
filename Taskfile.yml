@@ -66,3 +66,14 @@ tasks:
     deps: [build]
     cmds:
       - zig build run -- --year 1992 --month 10 --day 24 --hour 5 --minute 30 --longitude 126.9784 --lmt
+
+  loc:
+    desc: Count lines of code with tokei
+    cmds:
+      - tokei src/
+
+  today:
+    desc: Run saju for today at 11:00 KST
+    deps: [build]
+    cmds:
+      - zig build run -- --year {{now | date "2006"}} --month {{now | date "1"}} --day {{now | date "2"}} --hour 11 --minute 0

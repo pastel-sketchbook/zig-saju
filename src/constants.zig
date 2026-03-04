@@ -70,6 +70,7 @@ pub fn getTenGod(day_stem: Stem, other_stem: Stem) TenGod {
         2 => if (same_polarity) .pyeon_jae else .jeong_jae,
         3 => if (same_polarity) .pyeon_gwan else .jeong_gwan,
         4 => if (same_polarity) .pyeon_in else .jeong_in,
+        // Safe: forward_steps is (other_elem + 5 - day_elem) % 5, always 0-4.
         else => unreachable,
     };
 }

@@ -189,6 +189,7 @@ pub const Pillar = struct {
         while (n < 60) : (n += 10) {
             if (n % 12 == b) return @intCast(n);
         }
+        // Safe: valid stem/branch pairs always share parity, guaranteeing a match within 60.
         unreachable;
     }
 

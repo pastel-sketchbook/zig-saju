@@ -140,7 +140,7 @@ pub fn writeCompactText(
     const order = [4]usize{ 3, 2, 1, 0 }; // hour, day, month, year
     for (order, 0..) |pi, oi| {
         if (oi > 0) try writer.writeAll(" | ");
-        writePillarToken(writer, pillar_details[pi].stem, pillar_details[pi].branch, .stem_tok) catch {};
+        try writePillarToken(writer, pillar_details[pi].stem, pillar_details[pi].branch, .stem_tok);
     }
     try writer.writeByte('\n');
 
@@ -148,7 +148,7 @@ pub fn writeCompactText(
     try writer.writeAll("支   ");
     for (order, 0..) |pi, oi| {
         if (oi > 0) try writer.writeAll(" | ");
-        writePillarToken(writer, pillar_details[pi].stem, pillar_details[pi].branch, .branch_tok) catch {};
+        try writePillarToken(writer, pillar_details[pi].stem, pillar_details[pi].branch, .branch_tok);
     }
     try writer.writeByte('\n');
 
@@ -156,7 +156,7 @@ pub fn writeCompactText(
     try writer.writeAll("장간 ");
     for (order, 0..) |pi, oi| {
         if (oi > 0) try writer.writeAll(" | ");
-        writeHiddenStem(writer, pillar_details[pi].hidden_stems) catch {};
+        try writeHiddenStem(writer, pillar_details[pi].hidden_stems);
     }
     try writer.writeByte('\n');
 

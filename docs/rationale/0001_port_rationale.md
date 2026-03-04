@@ -36,16 +36,16 @@ All key test cases were ported to Zig.
 
 ## What Was Ported
 
-### Modules (4,309 lines of Zig, 7 source files)
+### Modules (4,322 lines of Zig, 7 source files)
 
 | Zig Module | Lines | Maps To |
 |:--|--:|:--|
-| types.zig | 364 | Type definitions extracted from across all TS files |
-| constants.zig | 370 | constants.ts (lookup tables, solar term data) |
-| manse.zig | 569 | manse.ts (calendar engine, pillars) |
-| analyze.zig | 1,322 | analyze.ts (relations, sals, daeun, geukguk, yongsin) |
+| types.zig | 365 | Type definitions extracted from across all TS files |
+| constants.zig | 371 | constants.ts (lookup tables, solar term data) |
+| manse.zig | 543 | manse.ts (calendar engine, pillars) |
+| analyze.zig | 1,318 | analyze.ts (relations, sals, daeun, geukguk, yongsin) |
 | format.zig | 818 | format.ts (compact + markdown formatters) |
-| root.zig | 610 | calculate.ts + public API surface |
+| root.zig | 651 | calculate.ts + public API surface |
 | main.zig | 256 | CLI (no TS equivalent -- ssaju is library-only) |
 
 ### Core Algorithms
@@ -145,9 +145,10 @@ named type). This led to creating explicit types like `StemRelationsResult`,
 ### 6. Fractional LMT Offset
 
 The initial implementation of `addMinutesToDateTime` used integer rounding for the
-minute offset, which caused a 1-minute discrepancy vs. the TS reference. Switching
-to `addMinutesToDateTimeFractional` with floating-point offset and floor (matching
-JS `Date` behavior) resolved this.
+minute offset, which caused a 1-minute discrepancy vs. the TS reference. The final
+`addMinutesToDateTimeFractional` uses floating-point offset and floor (matching JS
+`Date` behavior), which resolved the discrepancy. The integer-based version was
+removed as dead code during the code quality audit.
 
 ### 7. Writer Pattern for Formatters
 
@@ -166,6 +167,32 @@ port.
 - **ssaju (TS)**: 1900-2099
 - **zig-klc**: 1391-2050
 - **zig-saju**: 1900-2050 (intersection)
+
+## Code Quality Audit
+
+A comprehensive code quality audit was performed after the initial port was
+complete. The audit covered error handling, memory safety, style/documentation,
+dead code, secrets, and dependency hygiene.
+
+### Notable Properties
+
+- **Zero heap allocations** -- the entire codebase is stack-only, eliminating
+  memory leak risks entirely.
+- **No unsafe pointer operations** (`@ptrCast`, `@intToPtr`) anywhere.
+- **No global mutable state** -- all file-scope declarations are `const` or `fn`.
+- **Runtime safety never disabled** -- no `@setRuntimeSafety(false)` calls.
+
+### Issues Found and Fixed
+
+| Issue | Severity | Fix |
+|:--|:--|:--|
+| 3x `catch {}` in format.zig silently swallowing write errors | High (bug) | Changed to `try` to propagate errors consistently |
+| 7x `unreachable` / `orelse unreachable` without safety comments | Medium | Added safety invariant comments documenting why each is sound |
+| Test asserting nothing (`_ = gk` discarding geukguk result) | Medium | Added `expectEqual(.jongwang_gyeok, gk)` assertion |
+| Dead `addMinutesToDateTime` function (superseded by fractional variant) | Low | Removed |
+| Redundant `kstToJulianDay` / `kstToJulianDayPub` dual-wrapper | Low | Collapsed to single public function |
+| ~40 public declarations missing `///` doc comments in root.zig | Medium | Added doc comments to all public API re-exports |
+| `.gitignore` missing `.env*` pattern | Low | Added `.env*` and `.DS_Store` |
 
 ## What's Next
 

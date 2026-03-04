@@ -45,11 +45,6 @@ fn isDuringKoreaDST(year: u16, month: u8, day: u8, hour: u8, minute: u8) bool {
 
 /// Converts a KST local datetime to a fractional Julian Day (UTC).
 /// Accounts for Korea DST if applicable.
-fn kstToJulianDay(year: u16, month: u8, day: u8, hour: u8, minute: u8) f64 {
-    return kstToJulianDayImpl(year, month, day, hour, minute);
-}
-
-/// Public version of kstToJulianDay for use by the orchestrator.
 pub fn kstToJulianDayPub(year: u16, month: u8, day: u8, hour: u8, minute: u8) f64 {
     return kstToJulianDayImpl(year, month, day, hour, minute);
 }
@@ -58,7 +53,7 @@ fn kstToJulianDayImpl(year: u16, month: u8, day: u8, hour: u8, minute: u8) f64 {
     const dst_offset: i32 = if (isDuringKoreaDST(year, month, day, hour, minute)) 60 else 0;
     const total_offset_minutes: i32 = constants.BASE_KST_OFFSET_MINUTES + dst_offset;
 
-    // Get JDN at noon for the date
+    // Safe: callers validate year is within 1900-2050 (zig-klc supports 1391-2050).
     const jdn = klc.LunarSolarConverter.getJulianDayNumber(year, month, day) orelse unreachable;
     // JDN is at noon UTC. Convert to fractional JD for given time.
     // total minutes from midnight in local time
@@ -110,7 +105,7 @@ fn normalizeAngle(angle: f64) f64 {
 /// Finds the precise Julian Day (UTC) when the sun reaches a target ecliptic longitude.
 /// Uses Newton-Raphson iteration.
 fn findSolarTermJD(year: u16, target_degree: f64, approx_day_of_year: f64) f64 {
-    // Start of year as JDN
+    // Safe: Jan 1 of any supported year (1900-2050) is always valid in zig-klc.
     const jan1_jdn = klc.LunarSolarConverter.getJulianDayNumber(year, 1, 1) orelse unreachable;
     // Initial guess: JDN at noon + approx_day_of_year
     var current_jd: f64 = @as(f64, @floatFromInt(jan1_jdn)) + approx_day_of_year;
@@ -148,14 +143,14 @@ fn getLichunJD(year: u16) f64 {
 
 /// Returns the adjusted year based on whether the date is before or after Lichun.
 fn getAdjustedYearByLichun(year: u16, month: u8, day: u8, hour: u8, minute: u8) u16 {
-    const input_jd = kstToJulianDay(year, month, day, hour, minute);
+    const input_jd = kstToJulianDayImpl(year, month, day, hour, minute);
     const lichun_jd = getLichunJD(year);
     return if (input_jd < lichun_jd) year - 1 else year;
 }
 
 /// Returns the solar month index (0=寅月 ... 11=丑月) based on solar longitude.
 fn getSolarMonthIndex(year: u16, month: u8, day: u8, hour: u8, minute: u8) u4 {
-    const input_jd = kstToJulianDay(year, month, day, hour, minute);
+    const input_jd = kstToJulianDayImpl(year, month, day, hour, minute);
     const longitude = getSolarLongitude(input_jd);
     const normalized = posMod(longitude - 315.0, 360.0);
     return @intCast(@as(u32, @intFromFloat(@floor(normalized / 30.0))));
@@ -193,7 +188,9 @@ fn getMonthPillar(adjusted_year: u16, month_index: u4) Pillar {
 
 /// Day pillar using JDN difference from base date 1992-10-24 (ganji index 9).
 fn getDayPillar(year: u16, month: u8, day: u8) Pillar {
+    // Safe: 1992-10-24 is a known constant within zig-klc's supported range.
     const base_jdn = klc.LunarSolarConverter.getJulianDayNumber(1992, 10, 24) orelse unreachable;
+    // Safe: callers validate year is within 1900-2050.
     const target_jdn = klc.LunarSolarConverter.getJulianDayNumber(year, month, day) orelse unreachable;
     const base_ganji: i32 = 9;
     const days_diff: i32 = @as(i32, @intCast(target_jdn)) - @as(i32, @intCast(base_jdn));
@@ -298,33 +295,10 @@ fn lunarToSolar(year: u16, month: u8, day: u8, is_leap: bool) !SolarDate {
     };
 }
 
-/// Adds (positive or negative) minutes to a DateTime, handling day/month/year rollover.
-fn addMinutesToDateTime(dt: DateTime, offset_minutes: i32) DateTime {
-    const jdn = klc.LunarSolarConverter.getJulianDayNumber(dt.year, dt.month, dt.day) orelse unreachable;
-    // Total minutes from midnight
-    const minutes_from_midnight: i32 = @as(i32, @intCast(dt.hour)) * 60 + @as(i32, @intCast(dt.minute));
-    const adjusted = minutes_from_midnight + offset_minutes;
-
-    const day_offset = @divFloor(adjusted, MINUTES_PER_DAY);
-    const remaining = @mod(adjusted, MINUTES_PER_DAY); // 0..1439
-    const new_hour: u8 = @intCast(@divFloor(remaining, 60));
-    const new_minute: u8 = @intCast(@mod(remaining, 60));
-
-    const new_jdn: u32 = @intCast(@as(i32, @intCast(jdn)) + day_offset);
-    const date = jdnToDate(new_jdn);
-
-    return .{
-        .year = date.year,
-        .month = date.month,
-        .day = date.day,
-        .hour = new_hour,
-        .minute = new_minute,
-    };
-}
-
 /// Adds a fractional minute offset to a DateTime, matching JS Date behavior
 /// (floor for hour/minute extraction after applying the fractional offset).
 fn addMinutesToDateTimeFractional(dt: DateTime, offset_minutes: f64) DateTime {
+    // Safe: dt comes from a previously validated date within 1900-2050.
     const jdn = klc.LunarSolarConverter.getJulianDayNumber(dt.year, dt.month, dt.day) orelse unreachable;
     const minutes_from_midnight: f64 = @as(f64, @floatFromInt(dt.hour)) * 60.0 + @as(f64, @floatFromInt(dt.minute));
     const adjusted = minutes_from_midnight + offset_minutes;

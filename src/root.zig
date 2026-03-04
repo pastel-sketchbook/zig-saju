@@ -1,53 +1,93 @@
 const std = @import("std");
 const testing = std.testing;
 
+/// Internal modules (for advanced use).
 pub const types = @import("types.zig");
+/// Lookup tables for stems, branches, ten gods, hidden stems, solar terms.
 pub const constants = @import("constants.zig");
+/// Calendar engine: solar longitude, solar terms, four pillars calculation.
 pub const manse = @import("manse.zig");
+/// Analysis: relations, sals, day strength, geukguk, yongsin, daeun/seyun/wolun.
 pub const analyze = @import("analyze.zig");
+/// Compact text and Markdown formatters.
 pub const format = @import("format.zig");
 
-// Re-export core types for convenience
+// --- Core types ---
+
+/// Heavenly Stem (천간): 甲乙丙丁戊己庚辛壬癸 (indices 0-9).
 pub const Stem = types.Stem;
+/// Earthly Branch (지지): 子丑寅卯辰巳午未申酉戌亥 (indices 0-11).
 pub const Branch = types.Branch;
+/// Five Elements (오행): 木火土金水.
 pub const Element = types.Element;
+/// Yin-Yang (음양).
 pub const YinYang = types.YinYang;
+/// Gender: male or female.
 pub const Gender = types.Gender;
+/// Calendar type: solar or lunar.
 pub const CalendarType = types.CalendarType;
+/// Ten God (십성): 비견, 겁재, 식신, 상관, 편재, 정재, 편관, 정관, 편인, 정인.
 pub const TenGod = types.TenGod;
+/// A stem-branch pair (간지).
 pub const Pillar = types.Pillar;
+/// The four pillars: year, month, day, hour.
 pub const FourPillars = types.FourPillars;
+/// Hidden stems (지장간) for a branch: up to 3 stems.
 pub const HiddenStems = types.HiddenStems;
+/// Input parameters for saju calculation.
 pub const SajuInput = types.SajuInput;
+/// Identifies one of the four pillars: year, month, day, hour.
 pub const PillarKey = types.PillarKey;
+/// A solar (Gregorian) date.
 pub const SolarDate = types.SolarDate;
+/// A date with time (year, month, day, hour, minute).
 pub const DateTime = types.DateTime;
+/// Normalized birth date after calendar conversion and DST adjustment.
 pub const NormalizedBirth = types.NormalizedBirth;
+/// Detailed analysis for a single pillar.
 pub const PillarDetail = types.PillarDetail;
 
-// Re-export key functions
+// --- Key functions ---
+
+/// Computes the ten god relationship between two stems.
 pub const getTenGod = constants.getTenGod;
+/// Returns the hidden stems for a given branch.
 pub const getHiddenStems = constants.getHiddenStems;
+/// Calculates the four pillars from a solar date and time.
 pub const calculateFourPillars = manse.calculateFourPillars;
+/// Normalizes a birth date input (lunar-to-solar conversion, DST, LMT).
 pub const normalizeBirthDate = manse.normalizeBirthDate;
 
-// Re-export analyze types and functions
+// --- Analyze types ---
+
+/// Day master strength classification: strong or weak.
 pub const DayStrength = analyze.DayStrength;
+/// Day strength result with classification and numeric score.
 pub const DayStrengthResult = analyze.DayStrengthResult;
+/// Geukguk (격국) classification.
 pub const Geukguk = analyze.Geukguk;
+/// Special sals (특수신살) for a pillar.
 pub const SpecialSals = analyze.SpecialSals;
+/// A single 10-year daeun (대운) period.
 pub const DaeunItem = analyze.DaeunItem;
+/// A single yearly seyun (세운) entry.
 pub const SeyunItem = analyze.SeyunItem;
+/// A single monthly wolun (월운) entry.
 pub const WolunItem = analyze.WolunItem;
+/// A stem-level relation (combination or clash).
 pub const StemRelation = analyze.StemRelation;
+/// Result of analyzing all stem relations across four pillars.
 pub const StemRelationsResult = analyze.StemRelationsResult;
+/// All branch-level relations across four pillars.
 pub const BranchRelations = analyze.BranchRelations;
+/// Advanced sinsal: gilsin (길신) and hyungsin (흉신) lists.
 pub const AdvancedSinsal = analyze.AdvancedSinsal;
 
 // =============================
 // SajuResult — Complete analysis result
 // =============================
 
+/// Complete saju analysis result containing pillars, relations, sals, daeun, and more.
 pub const SajuResult = struct {
     /// Original input.
     input: SajuInput,
@@ -197,6 +237,7 @@ pub const SajuResult = struct {
 // calculateSaju — Orchestrator
 // =============================
 
+/// Errors that can occur during saju calculation.
 pub const CalculateError = error{
     InvalidLunarDate,
 };

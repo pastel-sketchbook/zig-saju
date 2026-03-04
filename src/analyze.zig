@@ -1101,11 +1101,7 @@ test "geukguk: golden case is 종왕격" {
     // Month ten god: day stem 癸, month stem 庚 → 정인
     const month_tg = constants.getTenGod(pillars.day.stem, pillars.month.stem);
     const gk = determineGeukguk(month_tg, ds.score);
-    // The TS test expects 종왕격, which requires score >= 85
-    // Let's check what we get
-    _ = gk;
-    // Note: This may differ slightly from TS due to floating-point differences
-    // in solar longitude calculation. We just verify the function works.
+    try testing.expectEqual(Geukguk.jongwang_gyeok, gk);
 }
 
 test "yongsin: golden case [庚,甲,丁]" {
