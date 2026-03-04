@@ -1,0 +1,16 @@
+.{
+    .name = .saju,
+    .version = "0.1.0",
+    .fingerprint = 0xaea677e74005783f, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .klc = .{
+            .path = "../zig-klc",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

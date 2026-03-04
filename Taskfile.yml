@@ -1,0 +1,38 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+  fmt:
+    desc: Format Zig code using zig fmt
+    cmds:
+      - zig fmt src/
+
+  test:
+    desc: Run tests using zig build test
+    cmds:
+      - zig build test
+
+  build:
+    desc: Build the project using zig build
+    deps: [fmt]
+    cmds:
+      - zig build
+
+  run:
+    desc: Build and run the executable
+    deps: [build]
+    cmds:
+      - zig build run
+
+  check:
+    desc: Run format check and tests without modifying files
+    cmds:
+      - zig fmt --check src/
+      - zig build test
+
+  clean:
+    desc: Clean the build directory
+    cmds:
+      - rm -rf .zig-cache zig-out
