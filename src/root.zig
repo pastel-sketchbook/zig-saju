@@ -88,6 +88,10 @@ pub const RelationPriorityItem = analyze.RelationPriorityItem;
 pub const RelationPriorities = analyze.RelationPriorities;
 /// Advisory caution points derived from strong relations.
 pub const CautionPoints = analyze.CautionPoints;
+/// Hanja pillar code (2 CJK characters = 6 UTF-8 bytes).
+pub const HanjaCode = manse.HanjaCode;
+/// Manse reference codes for 6 key dates.
+pub const ReferenceCodes = manse.ReferenceCodes;
 
 // =============================
 // SajuResult — Complete analysis result
@@ -148,6 +152,9 @@ pub const SajuResult = struct {
 
     /// Caution points (advisory text strings for strong clashes).
     caution_points: CautionPoints,
+
+    /// Manse reference codes (만세력) for 6 dates relative to reference time.
+    reference_codes: ReferenceCodes,
 
     /// Daeun direction (true = forward/순행).
     daeun_forward: bool,
@@ -212,6 +219,7 @@ pub const SajuResult = struct {
             self.wolun,
             self.relation_priorities,
             self.caution_points,
+            self.reference_codes,
             current_year,
         );
     }
@@ -243,6 +251,7 @@ pub const SajuResult = struct {
             self.wolun,
             self.relation_priorities,
             self.caution_points,
+            self.reference_codes,
             current_year,
             self.interpretation(),
         );
@@ -259,7 +268,8 @@ pub const CalculateError = error{
 };
 
 /// Main entry point: calculates a complete saju analysis from input.
-pub fn calculateSaju(input: SajuInput, current_year: u16) CalculateError!SajuResult {
+/// `ref_time` is the current KST date/time for manse reference codes.
+pub fn calculateSaju(input: SajuInput, current_year: u16, ref_time: DateTime) CalculateError!SajuResult {
     // 1. Normalize birth date (lunar→solar, DST, LMT)
     const normalized = manse.normalizeBirthDate(input) catch return error.InvalidLunarDate;
     const calc = normalized.calculation;
@@ -348,6 +358,9 @@ pub fn calculateSaju(input: SajuInput, current_year: u16) CalculateError!SajuRes
     var interp_buf: [1024]u8 = undefined;
     const interp = analyze.generateInterpretation(&interp_buf, geukguk, five_elements, adv_sinsal);
 
+    // 14. Manse reference codes
+    const ref_codes = manse.buildReferenceCodes(ref_time);
+
     return .{
         .input = input,
         .normalized = normalized,
@@ -367,6 +380,7 @@ pub fn calculateSaju(input: SajuInput, current_year: u16) CalculateError!SajuRes
         .advanced_sinsal = adv_sinsal,
         .relation_priorities = rel_priorities,
         .caution_points = caution_pts,
+        .reference_codes = ref_codes,
         .daeun_forward = daeun_forward,
         .daeun_start_age = daeun_info.start_age,
         .daeun_precise_age = daeun_info.precise_age,
@@ -383,6 +397,9 @@ pub fn calculateSaju(input: SajuInput, current_year: u16) CalculateError!SajuRes
 // Tests
 // =============================
 
+// Fixed reference time for deterministic test output.
+const test_ref_time: DateTime = .{ .year = 2026, .month = 3, .day = 4, .hour = 12, .minute = 0 };
+
 test "calculateSaju: golden case 1992-10-24 05:30 solar male" {
     const result = try calculateSaju(.{
         .year = 1992,
@@ -392,7 +409,7 @@ test "calculateSaju: golden case 1992-10-24 05:30 solar male" {
         .minute = 30,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     // Pillars: 壬申/庚戌/癸酉/乙卯
     try testing.expectEqual(Stem.im, result.pillars.year.stem);
@@ -430,7 +447,7 @@ test "calculateSaju: lunar input matches solar" {
         .minute = 30,
         .gender = .male,
         .calendar = .lunar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     const solar_result = try calculateSaju(.{
         .year = 1992,
@@ -440,7 +457,7 @@ test "calculateSaju: lunar input matches solar" {
         .minute = 30,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     // Pillars should match
     try testing.expectEqual(solar_result.pillars.year.stem, lunar_result.pillars.year.stem);
@@ -460,7 +477,7 @@ test "calculateSaju: hour boundary 23:30 and 00:00 are 자시, 01:00 is 축시" 
         .minute = 30,
         .gender = .female,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
     const at0000 = try calculateSaju(.{
         .year = 2024,
         .month = 1,
@@ -469,7 +486,7 @@ test "calculateSaju: hour boundary 23:30 and 00:00 are 자시, 01:00 is 축시" 
         .minute = 0,
         .gender = .female,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
     const at0100 = try calculateSaju(.{
         .year = 2024,
         .month = 1,
@@ -478,7 +495,7 @@ test "calculateSaju: hour boundary 23:30 and 00:00 are 자시, 01:00 is 축시" 
         .minute = 0,
         .gender = .female,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     // 23:30 → 甲子 (gap/ja)
     try testing.expectEqual(Stem.gap, at2330.pillars.hour.stem);
@@ -502,7 +519,7 @@ test "calculateSaju: lichun boundary 2024-02-03 is 癸卯 year, 乙丑 month" {
         .minute = 0,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     // Before lichun 2024: year is still 癸卯
     try testing.expectEqual(Stem.gye, result.pillars.year.stem);
@@ -521,7 +538,7 @@ test "calculateSaju: lichun boundary 2024-02-05 is 甲辰 year, 丙寅 month" {
         .minute = 0,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     // After lichun 2024: year is 甲辰
     try testing.expectEqual(Stem.gap, result.pillars.year.stem);
@@ -541,7 +558,7 @@ test "calculateSaju: LMT correction changes hour pillar" {
         .minute = 30,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     try testing.expectEqual(Stem.eul, normal.pillars.hour.stem);
     try testing.expectEqual(Branch.myo, normal.pillars.hour.branch);
@@ -557,7 +574,7 @@ test "calculateSaju: LMT correction changes hour pillar" {
         .calendar = .solar,
         .apply_local_mean_time = true,
         .longitude = 126.9784,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     // LMT shifts time back ~33 minutes, crossing the 寅/卯 boundary
     try testing.expectEqual(Stem.gap, lmt.pillars.hour.stem);
@@ -578,7 +595,7 @@ test "calculateSaju: seyun ascending order and contains current year" {
         .minute = 30,
         .gender = .male,
         .calendar = .solar,
-    }, current_year);
+    }, current_year, test_ref_time);
 
     // Seyun years must be strictly ascending
     var i: usize = 1;
@@ -606,7 +623,7 @@ test "calculateSaju: compact output contains key content" {
         .minute = 30,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     var buf: [8192]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&buf);
@@ -637,7 +654,7 @@ test "calculateSaju: markdown output contains key sections" {
         .minute = 20,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     var buf: [16384]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&buf);
@@ -663,7 +680,7 @@ test "calculateSaju: daeun start age is valid" {
         .minute = 30,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     try testing.expect(result.daeun_start_age >= 1);
     try testing.expect(result.daeun_precise_age > 0);

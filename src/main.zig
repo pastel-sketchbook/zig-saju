@@ -135,6 +135,26 @@ fn getCurrentYear() u16 {
     return year_day.year;
 }
 
+/// Get the current KST date-time for manse reference codes.
+fn getCurrentKstDateTime() saju.DateTime {
+    const ts = std.time.timestamp();
+    const kst_ts = ts + 9 * std.time.s_per_hour;
+    const epoch_secs: std.time.epoch.EpochSeconds = .{ .secs = @intCast(kst_ts) };
+    const epoch_day = epoch_secs.getEpochDay();
+    const year_day = epoch_day.calculateYearDay();
+    const month_day = year_day.calculateMonthDay();
+    const day_secs = epoch_secs.getDaySeconds();
+    const hour = day_secs.getHoursIntoDay();
+    const minute = day_secs.getMinutesIntoHour();
+    return .{
+        .year = year_day.year,
+        .month = month_day.month.numeric(),
+        .day = month_day.day_index + 1,
+        .hour = @intCast(hour),
+        .minute = @intCast(minute),
+    };
+}
+
 pub fn main() !void {
     const stdout_file = std.fs.File.stdout();
     const stderr_file = std.fs.File.stderr();
@@ -233,8 +253,9 @@ pub fn main() !void {
     };
 
     const current_year = getCurrentYear();
+    const ref_time = getCurrentKstDateTime();
 
-    const result = saju.calculateSaju(input, current_year) catch |err| {
+    const result = saju.calculateSaju(input, current_year, ref_time) catch |err| {
         try stderr.print("Error calculating saju: {s}\n", .{@errorName(err)});
         try stderr.flush();
         std.process.exit(1);

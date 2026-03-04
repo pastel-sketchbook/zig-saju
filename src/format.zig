@@ -3,6 +3,7 @@ const testing = std.testing;
 const types = @import("types.zig");
 const constants = @import("constants.zig");
 const analyze = @import("analyze.zig");
+const manse = @import("manse.zig");
 
 const Stem = types.Stem;
 const Branch = types.Branch;
@@ -128,6 +129,7 @@ pub fn writeCompactText(
     wolun: [12]analyze.WolunItem,
     relation_priorities: analyze.RelationPriorities,
     caution_points: analyze.CautionPoints,
+    reference_codes: manse.ReferenceCodes,
     current_year: u16,
 ) !void {
     const day_stem = pillars.day.stem;
@@ -423,6 +425,16 @@ pub fn writeCompactText(
     for (0..caution_points.count) |i| {
         try writer.print("- {s}\n", .{caution_points.items[i]});
     }
+
+    // ## 만세력
+    try writer.writeAll("\n## 만세력\n");
+    try writer.print("이달 {s} 다음 {s} 오늘 {s} 내일 {s} ({s})\n", .{
+        @as([]const u8, &reference_codes.this_month),
+        @as([]const u8, &reference_codes.next_month),
+        @as([]const u8, &reference_codes.today),
+        @as([]const u8, &reference_codes.tomorrow),
+        reference_codes.now_label[0..reference_codes.now_label_len],
+    });
 }
 
 // =============================
@@ -455,6 +467,7 @@ pub fn writeMarkdown(
     wolun: [12]analyze.WolunItem,
     relation_priorities: analyze.RelationPriorities,
     caution_points: analyze.CautionPoints,
+    reference_codes: manse.ReferenceCodes,
     current_year: u16,
     interpretation: []const u8,
 ) !void {
@@ -789,6 +802,16 @@ pub fn writeMarkdown(
         });
     }
 
+    // ## 만세력
+    try writer.writeAll("\n## 만세력\n\n");
+    try writer.print("- 올해: {s}\n", .{@as([]const u8, &reference_codes.this_year)});
+    try writer.print("- 내년: {s}\n", .{@as([]const u8, &reference_codes.next_year)});
+    try writer.print("- 이번달: {s}\n", .{@as([]const u8, &reference_codes.this_month)});
+    try writer.print("- 다음달: {s}\n", .{@as([]const u8, &reference_codes.next_month)});
+    try writer.print("- 오늘: {s}\n", .{@as([]const u8, &reference_codes.today)});
+    try writer.print("- 내일: {s}\n", .{@as([]const u8, &reference_codes.tomorrow)});
+    try writer.print("- 오늘날짜: {s}\n", .{reference_codes.now_label[0..reference_codes.now_label_len]});
+
     // ## 해석
     if (interpretation.len > 0) {
         try writer.writeAll("\n## 해석\n\n");
@@ -801,6 +824,9 @@ pub fn writeMarkdown(
 // Tests
 // =============================
 
+// Fixed reference time for deterministic test output.
+const test_ref_time: types.DateTime = .{ .year = 2026, .month = 3, .day = 4, .hour = 12, .minute = 0 };
+
 test "writeCompactText: produces output for golden case" {
     const root = @import("root.zig");
     const result = try root.calculateSaju(.{
@@ -811,7 +837,7 @@ test "writeCompactText: produces output for golden case" {
         .minute = 30,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     var buf: [8192]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&buf);
@@ -840,6 +866,7 @@ test "writeCompactText: produces output for golden case" {
         result.wolun,
         result.relation_priorities,
         result.caution_points,
+        result.reference_codes,
         2026,
     );
 
@@ -854,6 +881,7 @@ test "writeCompactText: produces output for golden case" {
     try testing.expect(std.mem.indexOf(u8, output, "## 월운") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 관계 강도") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 주의 포인트") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "## 만세력") != null);
 }
 
 test "writeMarkdown: produces output for golden case" {
@@ -866,7 +894,7 @@ test "writeMarkdown: produces output for golden case" {
         .minute = 30,
         .gender = .male,
         .calendar = .solar,
-    }, 2026);
+    }, 2026, test_ref_time);
 
     var buf: [16384]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&buf);
@@ -895,6 +923,7 @@ test "writeMarkdown: produces output for golden case" {
         result.wolun,
         result.relation_priorities,
         result.caution_points,
+        result.reference_codes,
         2026,
         result.interpretation(),
     );
@@ -908,4 +937,5 @@ test "writeMarkdown: produces output for golden case" {
     try testing.expect(std.mem.indexOf(u8, output, "## 대운") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 관계 강도 (우선순위)") != null);
     try testing.expect(std.mem.indexOf(u8, output, "## 해석 시 주의 포인트") != null);
+    try testing.expect(std.mem.indexOf(u8, output, "## 만세력") != null);
 }

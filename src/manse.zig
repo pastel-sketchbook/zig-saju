@@ -385,6 +385,94 @@ pub fn resolveNearestMajorSolarTermJD(birth_jd: f64, forward: bool) f64 {
 }
 
 // =============================
+// Manse Reference Codes (만세력)
+// =============================
+
+/// A single hanja pillar code, e.g. "丙午" — 2 CJK characters = 6 UTF-8 bytes.
+pub const HanjaCode = [6]u8;
+
+/// Reference codes for 6 dates relative to a given KST date/time.
+pub const ReferenceCodes = struct {
+    this_year: HanjaCode,
+    next_year: HanjaCode,
+    this_month: HanjaCode,
+    next_month: HanjaCode,
+    today: HanjaCode,
+    tomorrow: HanjaCode,
+    /// Reference date label: "YYYY-MM-DD HH:MM KST" (max 21 bytes).
+    now_label: [21]u8,
+    now_label_len: u8,
+};
+
+/// Encodes a pillar's stem+branch hanja into a 6-byte array.
+fn encodePillarHanja(pillar: Pillar) HanjaCode {
+    var buf: HanjaCode = undefined;
+    const stem_h = pillar.stem.hanja();
+    const branch_h = pillar.branch.hanja();
+    @memcpy(buf[0..3], stem_h[0..3]);
+    @memcpy(buf[3..6], branch_h[0..3]);
+    return buf;
+}
+
+/// Advances a SolarDate by the given number of days using JDN arithmetic.
+fn advanceDateByDays(date: SolarDate, days: u32) SolarDate {
+    const jdn = klc.LunarSolarConverter.getJulianDayNumber(date.year, date.month, date.day) orelse unreachable;
+    return jdnToDate(jdn + days);
+}
+
+/// Builds manse reference codes for 6 dates relative to the given KST reference time.
+///
+/// The 6 codes are:
+/// - **this_year**: year pillar hanja for the reference date
+/// - **next_year**: year pillar hanja for +370 days (ensures next solar year)
+/// - **this_month**: month pillar hanja for the reference date
+/// - **next_month**: month pillar hanja for +32 days (ensures next month)
+/// - **today**: day pillar hanja for the reference date
+/// - **tomorrow**: day pillar hanja for +1 day
+pub fn buildReferenceCodes(ref_time: DateTime) ReferenceCodes {
+    const ref_date = SolarDate{ .year = ref_time.year, .month = ref_time.month, .day = ref_time.day };
+
+    // Compute pillars for reference date
+    const now_pillars = calculateFourPillars(ref_time.year, ref_time.month, ref_time.day, ref_time.hour, ref_time.minute);
+
+    // +370 days → next year
+    const next_year_date = advanceDateByDays(ref_date, 370);
+    const next_year_pillars = calculateFourPillars(next_year_date.year, next_year_date.month, next_year_date.day, ref_time.hour, ref_time.minute);
+
+    // +32 days → next month
+    const next_month_date = advanceDateByDays(ref_date, 32);
+    const next_month_pillars = calculateFourPillars(next_month_date.year, next_month_date.month, next_month_date.day, ref_time.hour, ref_time.minute);
+
+    // +1 day → tomorrow
+    const tomorrow_date = advanceDateByDays(ref_date, 1);
+    const tomorrow_pillars = calculateFourPillars(tomorrow_date.year, tomorrow_date.month, tomorrow_date.day, ref_time.hour, ref_time.minute);
+
+    // Build now label: "YYYY-MM-DD HH:MM KST"
+    var label_buf: [21]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&label_buf);
+    const w = fbs.writer();
+    w.print("{d}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2} KST", .{
+        ref_time.year,
+        ref_time.month,
+        ref_time.day,
+        ref_time.hour,
+        ref_time.minute,
+    }) catch unreachable;
+    const label_len: u8 = @intCast(fbs.getWritten().len);
+
+    return .{
+        .this_year = encodePillarHanja(now_pillars.year),
+        .next_year = encodePillarHanja(next_year_pillars.year),
+        .this_month = encodePillarHanja(now_pillars.month),
+        .next_month = encodePillarHanja(next_month_pillars.month),
+        .today = encodePillarHanja(now_pillars.day),
+        .tomorrow = encodePillarHanja(tomorrow_pillars.day),
+        .now_label = label_buf,
+        .now_label_len = label_len,
+    };
+}
+
+// =============================
 // Tests
 // =============================
 
@@ -540,4 +628,72 @@ test "solar longitude is in valid range" {
     const lon = getSolarLongitude(jd);
     // Around March equinox, longitude should be near 0° (within a few degrees)
     try testing.expect(lon < 5.0 or lon > 355.0);
+}
+
+// =============================
+// Reference Codes Tests
+// =============================
+
+test "buildReferenceCodes: golden case date produces valid codes" {
+    const codes = buildReferenceCodes(.{
+        .year = 1992,
+        .month = 10,
+        .day = 24,
+        .hour = 5,
+        .minute = 30,
+    });
+
+    // today's day pillar: 1992-10-24 → 癸酉 (golden case day pillar)
+    const today_str = codes.today[0..6];
+    try testing.expectEqualStrings("癸酉", today_str);
+
+    // this year pillar: 1992 → 壬申 (golden case year pillar)
+    const this_year_str = codes.this_year[0..6];
+    try testing.expectEqualStrings("壬申", this_year_str);
+
+    // this month pillar: 1992-10 → 庚戌 (golden case month pillar)
+    const this_month_str = codes.this_month[0..6];
+    try testing.expectEqualStrings("庚戌", this_month_str);
+
+    // tomorrow: 1992-10-25 → should differ from today
+    const tomorrow_str = codes.tomorrow[0..6];
+    try testing.expect(!std.mem.eql(u8, today_str, tomorrow_str));
+
+    // next year (+370 days = 1993-10-29) → should have different year pillar
+    const next_year_str = codes.next_year[0..6];
+    try testing.expect(!std.mem.eql(u8, this_year_str, next_year_str));
+}
+
+test "buildReferenceCodes: now label format" {
+    const codes = buildReferenceCodes(.{
+        .year = 2026,
+        .month = 3,
+        .day = 4,
+        .hour = 11,
+        .minute = 0,
+    });
+
+    const label = codes.now_label[0..codes.now_label_len];
+    try testing.expectEqualStrings("2026-03-04 11:00 KST", label);
+}
+
+test "buildReferenceCodes: next month differs from this month" {
+    const codes = buildReferenceCodes(.{
+        .year = 2026,
+        .month = 1,
+        .day = 15,
+        .hour = 12,
+        .minute = 0,
+    });
+
+    const this_m = codes.this_month[0..6];
+    const next_m = codes.next_month[0..6];
+    // Jan → Feb should produce different month pillars
+    try testing.expect(!std.mem.eql(u8, this_m, next_m));
+}
+
+test "encodePillarHanja: golden case day pillar" {
+    const pillars = calculateFourPillars(1992, 10, 24, 5, 30);
+    const code = encodePillarHanja(pillars.day);
+    try testing.expectEqualStrings("癸酉", &code);
 }
