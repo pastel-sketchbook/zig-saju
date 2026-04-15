@@ -80,9 +80,9 @@ export fn calculate(
 
     const result = saju.calculateSaju(input, cur_year, ref_time) catch return -1;
 
-    var stream = std.io.fixedBufferStream(&output_buf);
-    result.writeJson(stream.writer(), cur_year) catch return -2;
-    output_len = @intCast(stream.getWritten().len);
+    var w: std.Io.Writer = .fixed(&output_buf);
+    result.writeJson(&w, cur_year) catch return -2;
+    output_len = @intCast(w.buffered().len);
 
     return 0;
 }

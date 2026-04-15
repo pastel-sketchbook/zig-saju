@@ -449,16 +449,14 @@ pub fn buildReferenceCodes(ref_time: DateTime) ReferenceCodes {
 
     // Build now label: "YYYY-MM-DD HH:MM KST"
     var label_buf: [21]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&label_buf);
-    const w = fbs.writer();
-    w.print("{d}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2} KST", .{
+    const label_slice = std.fmt.bufPrint(&label_buf, "{d}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2} KST", .{
         ref_time.year,
         ref_time.month,
         ref_time.day,
         ref_time.hour,
         ref_time.minute,
     }) catch unreachable;
-    const label_len: u8 = @intCast(fbs.getWritten().len);
+    const label_len: u8 = @intCast(label_slice.len);
 
     return .{
         .this_year = encodePillarHanja(now_pillars.year),

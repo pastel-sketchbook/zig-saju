@@ -840,9 +840,9 @@ test "writeCompactText: produces output for golden case" {
     }, 2026, test_ref_time);
 
     var buf: [8192]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&buf);
+    var w: std.Io.Writer = .fixed(&buf);
     try writeCompactText(
-        fbs.writer(),
+        &w,
         result.input,
         result.normalized,
         result.pillars,
@@ -870,7 +870,7 @@ test "writeCompactText: produces output for golden case" {
         2026,
     );
 
-    const output = fbs.getWritten();
+    const output = w.buffered();
     try testing.expect(output.len > 100);
     try testing.expect(std.mem.startsWith(u8, output, "## 기본\n"));
     // Contains key sections
@@ -897,9 +897,9 @@ test "writeMarkdown: produces output for golden case" {
     }, 2026, test_ref_time);
 
     var buf: [16384]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&buf);
+    var w: std.Io.Writer = .fixed(&buf);
     try writeMarkdown(
-        fbs.writer(),
+        &w,
         result.input,
         result.normalized,
         result.pillars,
@@ -928,7 +928,7 @@ test "writeMarkdown: produces output for golden case" {
         result.interpretation(),
     );
 
-    const output = fbs.getWritten();
+    const output = w.buffered();
     try testing.expect(output.len > 200);
     try testing.expect(std.mem.startsWith(u8, output, "## 기본 정보\n"));
     try testing.expect(std.mem.indexOf(u8, output, "## 사주 원국") != null);
@@ -1557,9 +1557,9 @@ test "writeJson: produces valid JSON structure for golden case" {
     }, 2026, test_ref_time);
 
     var buf: [32768]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&buf);
+    var w: std.Io.Writer = .fixed(&buf);
     try writeJson(
-        fbs.writer(),
+        &w,
         result.input,
         result.normalized,
         result.pillars,
@@ -1590,7 +1590,7 @@ test "writeJson: produces valid JSON structure for golden case" {
         result.interpretation(),
     );
 
-    const output = fbs.getWritten();
+    const output = w.buffered();
     // Starts with { and ends with }
     try testing.expect(output.len > 100);
     try testing.expect(output[0] == '{');

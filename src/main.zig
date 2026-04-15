@@ -56,8 +56,8 @@ fn printUsage(writer: *std.Io.Writer) !void {
     );
 }
 
-fn parseArgs() !CliArgs {
-    var args = std.process.args();
+fn parseArgs(args_data: std.process.Args) !CliArgs {
+    var args = args_data.iterate();
     _ = args.skip();
 
     var cli = CliArgs{};
@@ -127,8 +127,8 @@ fn parseArgs() !CliArgs {
 }
 
 /// Get the current year from system time (KST = UTC+9).
-fn getCurrentYear() u16 {
-    const ts = std.time.timestamp();
+fn getCurrentYear(io: std.Io) u16 {
+    const ts = std.Io.Clock.real.now(io).toSeconds();
     const kst_ts = ts + 9 * std.time.s_per_hour;
     const epoch_secs: std.time.epoch.EpochSeconds = .{ .secs = @intCast(kst_ts) };
     const year_day = epoch_secs.getEpochDay().calculateYearDay();
@@ -136,8 +136,8 @@ fn getCurrentYear() u16 {
 }
 
 /// Get the current KST date-time for manse reference codes.
-fn getCurrentKstDateTime() saju.DateTime {
-    const ts = std.time.timestamp();
+fn getCurrentKstDateTime(io: std.Io) saju.DateTime {
+    const ts = std.Io.Clock.real.now(io).toSeconds();
     const kst_ts = ts + 9 * std.time.s_per_hour;
     const epoch_secs: std.time.epoch.EpochSeconds = .{ .secs = @intCast(kst_ts) };
     const epoch_day = epoch_secs.getEpochDay();
@@ -155,20 +155,20 @@ fn getCurrentKstDateTime() saju.DateTime {
     };
 }
 
-pub fn main() !void {
-    const stdout_file = std.fs.File.stdout();
-    const stderr_file = std.fs.File.stderr();
+pub fn main(init: std.process.Init) !void {
+    const stdout_file = std.Io.File.stdout();
+    const stderr_file = std.Io.File.stderr();
 
     var stdout_buf: [4096]u8 = undefined;
     var stderr_buf: [1024]u8 = undefined;
 
-    var stdout_w = stdout_file.writer(&stdout_buf);
-    var stderr_w = stderr_file.writer(&stderr_buf);
+    var stdout_w = stdout_file.writer(init.io, &stdout_buf);
+    var stderr_w = stderr_file.writer(init.io, &stderr_buf);
 
     const stdout = &stdout_w.interface;
     const stderr = &stderr_w.interface;
 
-    const cli = parseArgs() catch |err| {
+    const cli = parseArgs(init.minimal.args) catch |err| {
         try stderr.print("Error: {s}\n\n", .{@errorName(err)});
         try printUsage(stderr);
         try stderr.flush();
@@ -252,8 +252,8 @@ pub fn main() !void {
         .apply_local_mean_time = cli.lmt,
     };
 
-    const current_year = getCurrentYear();
-    const ref_time = getCurrentKstDateTime();
+    const current_year = getCurrentYear(init.io);
+    const ref_time = getCurrentKstDateTime(init.io);
 
     const result = saju.calculateSaju(input, current_year, ref_time) catch |err| {
         try stderr.print("Error calculating saju: {s}\n", .{@errorName(err)});

@@ -661,9 +661,9 @@ test "calculateSaju: compact output contains key content" {
     }, 2026, test_ref_time);
 
     var buf: [8192]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&buf);
-    try result.writeCompact(fbs.writer(), 2026);
-    const compact = fbs.getWritten();
+    var w: std.Io.Writer = .fixed(&buf);
+    try result.writeCompact(&w, 2026);
+    const compact = w.buffered();
 
     // Key sections and content
     try testing.expect(std.mem.indexOf(u8, compact, "## 원국") != null);
@@ -692,9 +692,9 @@ test "calculateSaju: markdown output contains key sections" {
     }, 2026, test_ref_time);
 
     var buf: [16384]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&buf);
-    try result.writeMarkdownFmt(fbs.writer(), 2026);
-    const md = fbs.getWritten();
+    var w: std.Io.Writer = .fixed(&buf);
+    try result.writeMarkdownFmt(&w, 2026);
+    const md = w.buffered();
 
     // Key markdown sections
     try testing.expect(std.mem.indexOf(u8, md, "## 사주 원국") != null);
@@ -733,9 +733,9 @@ test "calculateSaju: JSON output contains key fields" {
     }, 2026, test_ref_time);
 
     var buf: [32768]u8 = undefined;
-    var fbs = std.io.fixedBufferStream(&buf);
-    try result.writeJson(fbs.writer(), 2026);
-    const json = fbs.getWritten();
+    var w: std.Io.Writer = .fixed(&buf);
+    try result.writeJson(&w, 2026);
+    const json = w.buffered();
 
     // Valid JSON envelope
     try testing.expect(json[0] == '{');

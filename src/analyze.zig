@@ -48,8 +48,18 @@ pub fn countFiveElements(pillars: FourPillars) [5]u8 {
 // =============================
 
 const SAL_NAMES = [12][]const u8{
-    "년살",    "월살",    "망신살", "장성살", "반안살", "역마살",
-    "육해살", "화개살", "겁살",    "재살",    "천살",    "지살",
+    "년살",
+    "월살",
+    "망신살",
+    "장성살",
+    "반안살",
+    "역마살",
+    "육해살",
+    "화개살",
+    "겁살",
+    "재살",
+    "천살",
+    "지살",
 };
 
 /// Returns the twelve-sal name for a target branch relative to the year branch.
@@ -521,7 +531,16 @@ pub const BranchRelationType = enum(u4) {
 
     pub fn korean(self: BranchRelationType) []const u8 {
         const table = [_][]const u8{
-            "육합", "충", "형", "파", "해", "원진", "귀문", "삼합", "반합", "방합",
+            "육합",
+            "충",
+            "형",
+            "파",
+            "해",
+            "원진",
+            "귀문",
+            "삼합",
+            "반합",
+            "방합",
         };
         return table[@intFromEnum(self)];
     }
