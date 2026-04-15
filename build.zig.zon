@@ -1,6 +1,6 @@
 .{
     .name = .saju,
-    .version = "0.3.2",
+    .version = "0.3.3",
     .fingerprint = 0xaea677e74005783f, // Changing this has security and trust implications.
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
